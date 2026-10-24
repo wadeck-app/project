@@ -1,94 +1,153 @@
-import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), '..');
-const sdkDir = join(packageDir, '..', 'project-sdk');
+const repoRoot = join(packageDir, '..', '..');
+const bundleDir = join(packageDir, 'dist-bundle');
+const tsx = join(repoRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx');
+const STAMP = '2099.1.2-003-deadbeef';
 
-interface PackageJson {
-  version: string;
-  bin: Record<string, string>;
+interface Outcome {
+  status: number | null;
+  stdout: string;
+  stderr: string;
 }
 
-const manifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as PackageJson;
+function runBundleScript(env: NodeJS.ProcessEnv): Outcome {
+  const { BUNDLE_VERSION: _inherited, ...rest } = process.env;
+  const result = spawnSync(tsx, ['ci/scripts/bundle.ts'], { cwd: packageDir, env: { ...rest, ...env }, encoding: 'utf8', shell: process.platform === 'win32' });
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+}
 
-beforeAll(() => {
-  // These tests check the BUILT package: a missing build is a failure, never a skip.
-  for (const required of [join(packageDir, 'dist', 'main.js'), join(sdkDir, 'dist', 'esm', 'index.js')]) {
-    if (!existsSync(required)) {
-      throw new Error(`${required} is missing: run 'npm run build' before 'npm test' (the packaging tests use the compiled packages)`);
-    }
-  }
+// Every bundle run schedules a background update after its command: it must never see the real config folder, and
+// "autoUpdate: false" keeps it from ever installing anything.
+const sandbox = mkdtempSync(join(tmpdir(), 'project-cli-dist-env-'));
+const isolatedEnv = { XDG_CONFIG_HOME: join(sandbox, 'xdg'), HOME: join(sandbox, 'home'), USERPROFILE: join(sandbox, 'home') };
+mkdirSync(join(sandbox, 'xdg', 'project'), { recursive: true });
+writeFileSync(join(sandbox, 'xdg', 'project', 'config.yml'), 'autoUpdate: false\n');
+afterAll(() => rmSync(sandbox, { recursive: true, force: true }));
+
+function node(script: string, args: string[]): Outcome {
+  const result = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: { ...process.env, ...isolatedEnv } });
+  return { status: result.status, stdout: result.stdout.trim(), stderr: result.stderr.trim() };
+}
+
+// The steps below build and use the same dist-bundle folder: they run in order, in this file only.
+describe('the bundle (ci/scripts/bundle.ts)', () => {
+  it('refuses to build without BUNDLE_VERSION, and says so', () => {
+    const missing = runBundleScript({});
+    expect(missing.status).not.toBe(0);
+    expect(missing.stderr).toContain('BUNDLE_VERSION');
+    expect(missing.stderr).toContain('refusing to build');
+    const empty = runBundleScript({ BUNDLE_VERSION: '' });
+    expect(empty.status).not.toBe(0);
+    expect(empty.stderr).toContain('refusing to build');
+  });
+
+  it('builds project.cjs and project-updater.cjs stamped with the version', () => {
+    const built = runBundleScript({ BUNDLE_VERSION: STAMP });
+    expect(built.stderr).toBe('');
+    expect(built.status).toBe(0);
+    expect(existsSync(join(bundleDir, 'project.cjs'))).toBe(true);
+    expect(existsSync(join(bundleDir, 'project-updater.cjs'))).toBe(true);
+  });
+
+  it('keeps the updater bundle under 500 KB', () => {
+    expect(statSync(join(bundleDir, 'project-updater.cjs')).size).toBeLessThan(500 * 1024);
+  });
+
+  it('prints the stamped version, whatever the package.json says', () => {
+    expect(node(join(bundleDir, 'project.cjs'), ['--version'])).toMatchObject({ status: 0, stdout: STAMP });
+  });
+
+  it('passes its own self-check, which is what the updater runs on a new install', () => {
+    const result = node(join(bundleDir, 'project.cjs'), ['cli', 'self-check']);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toContain('[ok]');
+    // The checks work in temporary registries: the registry of the user is not created.
+    expect(existsSync(join(sandbox, 'xdg', 'project', 'registry.json'))).toBe(false);
+  });
 });
 
-describe('the bin', () => {
-  it('points package.json "bin.project" at a built file', () => {
-    expect(manifest.bin).toEqual({ project: './dist/main.js' });
-    expect(existsSync(join(packageDir, manifest.bin['project']!))).toBe(true);
-  });
-
-  it('starts with a node shebang, so npm can link it on every platform', () => {
-    const first = readFileSync(join(packageDir, manifest.bin['project']!), 'utf8').split(/\r?\n/, 1)[0];
-    expect(first).toBe('#!/usr/bin/env node');
-  });
-});
-
-describe('npm pack', () => {
-  interface PackedFile {
-    path: string;
-  }
-
-  function packedFiles(): string[] {
-    const output = execSync('npm pack --dry-run --json', { cwd: packageDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    return ((JSON.parse(output) as { files: PackedFile[] }[])[0]!.files).map((file) => file.path).sort();
-  }
-
-  it('publishes the manifest, the README and the compiled code, nothing else', () => {
-    const files = packedFiles();
-    expect(files).toContain('package.json');
-    expect(files).toContain('README.md');
-    expect(files).toContain('dist/main.js');
-    expect(files).toContain('dist/commands/add.js');
-    const unexpected = files.filter((file) => !/^(package\.json|README\.md|dist\/.+\.js(\.map)?)$/.test(file));
-    expect(unexpected, 'files that would be published by mistake').toEqual([]);
-  });
-
-  it('never publishes sources, tests, declarations or build info', () => {
-    const files = packedFiles();
-    expect(files.filter((file) => /^src\/|\.test\.|\.d\.ts$|tsbuildinfo|testHelpers/.test(file))).toEqual([]);
-  });
-});
-
-describe('the packed layout', () => {
+describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy-binaries.sh)', () => {
   let root: string;
 
+  function bash(script: string, args: string[] = []): Outcome {
+    const result = spawnSync('bash', [join(packageDir, 'ci', 'scripts', script).replace(/\\/g, '/'), ...args], { cwd: root, encoding: 'utf8' });
+    return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+  }
+
+  function packageJson(name: string): Record<string, unknown> {
+    return JSON.parse(readFileSync(join(root, 'packages', name, 'package.json'), 'utf8')) as Record<string, unknown>;
+  }
+
   beforeAll(() => {
-    root = mkdtempSync(join(tmpdir(), 'project-cli-pack-'));
-    const tarball = JSON.parse(execSync(`npm pack --json --pack-destination "${root}"`, { cwd: packageDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })) as {
-      filename: string;
-    }[];
-    // Relative names with cwd: GNU tar reads "C:..." as a remote host.
-    execSync(`tar -xzf "${tarball[0]!.filename}"`, { cwd: root });
-    // The install of the SDK dependency is replaced by a link to the workspace build.
-    mkdirSync(join(root, 'package', 'node_modules', '@wadeck-app'), { recursive: true });
-    symlinkSync(sdkDir, join(root, 'package', 'node_modules', '@wadeck-app', 'project-sdk'), process.platform === 'win32' ? 'junction' : 'dir');
+    for (const required of [join(bundleDir, 'project.cjs'), join(bundleDir, 'project-updater.cjs')]) {
+      if (!existsSync(required)) {
+        throw new Error(`${required} is missing: the bundle step above must have built it`);
+      }
+    }
+    // A fake repository root: the scripts work on paths relative to it, as in CI. The Go launchers are replaced by small files.
+    root = mkdtempSync(join(tmpdir(), 'project-cli-dist-'));
+    const cli = join(root, 'packages', 'project-cli');
+    mkdirSync(join(cli, 'launcher-go', 'dist'), { recursive: true });
+    for (const launcher of ['project_windows_release.exe', 'project_darwin_arm64_release', 'project_darwin_amd64_release']) {
+      writeFileSync(join(cli, 'launcher-go', 'dist', launcher), `fake ${launcher}`);
+    }
+    cpSync(bundleDir, join(cli, 'dist-bundle'), { recursive: true });
+    cpSync(join(packageDir, 'README.md'), join(cli, 'README.md'));
   });
 
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-  function runPacked(args: string): string {
-    const env = { ...process.env, XDG_CONFIG_HOME: join(root, 'xdg'), HOME: join(root, 'home'), USERPROFILE: join(root, 'home') };
-    return execSync(`"${process.execPath}" "${join(root, 'package', 'dist', 'main.js')}" ${args}`, { encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
-  }
-
-  it('prints its own version from the package.json that was packed', () => {
-    expect(runPacked('--version').trim()).toBe(manifest.version);
+  it('generates the dist package under the published name, and the 3 platform packages', () => {
+    const generated = bash('generate-platform-packages.sh', ['project']);
+    expect(generated.status, generated.stderr).toBe(0);
+    expect(packageJson('project-cli-dist')).toMatchObject({
+      name: '@wadeck-app/project-cli',
+      bin: { project: './bin/project.js' },
+      optionalDependencies: {
+        '@wadeck-app/project-cli-win32-x64': expect.any(String),
+        '@wadeck-app/project-cli-darwin-arm64': expect.any(String),
+        '@wadeck-app/project-cli-darwin-x64': expect.any(String),
+      },
+    });
+    expect(packageJson('project-cli-dist')).not.toHaveProperty('private', true);
+    expect(packageJson('project-cli-dist')).not.toHaveProperty('dependencies');
+    expect(packageJson('project-cli-win32-x64')).toMatchObject({ name: '@wadeck-app/project-cli-win32-x64', os: ['win32'], cpu: ['x64'], files: ['project.exe'] });
+    expect(packageJson('project-cli-darwin-arm64')).toMatchObject({ name: '@wadeck-app/project-cli-darwin-arm64', os: ['darwin'], cpu: ['arm64'], files: ['project'] });
+    expect(packageJson('project-cli-darwin-x64')).toMatchObject({ name: '@wadeck-app/project-cli-darwin-x64', os: ['darwin'], cpu: ['x64'], files: ['project'] });
   });
 
-  it('runs a command against an empty registry', () => {
-    expect(runPacked('list --json').trim()).toBe('[]');
+  it('generates a launcher that starts with a node shebang and names the platform packages', () => {
+    const launcher = readFileSync(join(root, 'packages', 'project-cli-dist', 'bin', 'project.js'), 'utf8');
+    expect(launcher.split('\n')[0]).toBe('#!/usr/bin/env node');
+    expect(launcher).toContain('@wadeck-app/project-cli-win32-x64');
+    expect(launcher).toContain("'project.cjs'");
+    expect(launcher).not.toContain('{{');
+  });
+
+  it('copies the launchers, the bundles and the README into the packages', () => {
+    const copied = bash('copy-binaries.sh');
+    expect(copied.status, copied.stderr).toBe(0);
+    for (const file of ['project-cli-win32-x64/project.exe', 'project-cli-darwin-arm64/project', 'project-cli-darwin-x64/project']) {
+      expect(existsSync(join(root, 'packages', file)), file).toBe(true);
+    }
+  });
+
+  it('publishes exactly the launcher, the two bundles, the README and the manifest in the dist package', () => {
+    const dist = join(root, 'packages', 'project-cli-dist');
+    const output = execFileSync('npm', ['pack', '--dry-run', '--json'], { cwd: dist, encoding: 'utf8', shell: process.platform === 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
+    const files = (JSON.parse(output) as { files: { path: string }[] }[])[0]!.files.map((f) => f.path).sort();
+    expect(files).toEqual(['README.md', 'bin/project.js', 'package.json', 'project-updater.cjs', 'project.cjs']);
+  });
+
+  it('runs from the generated layout and prints the stamped version', () => {
+    const result = node(join(root, 'packages', 'project-cli-dist', 'project.cjs'), ['--version']);
+    expect(result).toMatchObject({ status: 0, stdout: STAMP });
   });
 });

@@ -68,10 +68,10 @@ Introduce a "project" concept: a base folder (usually a git repo, not required) 
 | 25 | `project remove`: does it delete the project's config/data folder (task guarantees today that remove never deletes data) | High | Resolved (Decision #19: soft delete) |
 | 32 | Soft delete details: reuse of a deleted project's name/aliases, restore command (removing a project with children: Decision #24) | Medium | Partially resolved; name reuse and restore open |
 | 26 | Origin recording format: fields, where (task history, event payloads, hook env), virtual project or no project | Medium | Open |
-| 27 | Which identifier appears in app URLs/API (id length, name/alias change on rename); how the app-core module finds the registry | Medium | Open |
-| 28 | Several paths: cwd for events and `ctx.project.path` from a non-main worktree; virtual projects (no cwd) and events | High | Resolved (Decision #25; virtual projects: Decision #5) |
-| 29 | Inheritance chain: where a write (`task type add`) goes, and cross-level validation (e.g. at most one default status) | Medium | Open |
-| 30 | Do lock + atomic write cover tool data (task-index.json read-modify-write), or only the registry | Medium | Open |
+| 27 | Which identifier appears in app URLs/API (id length, name/alias change on rename); how the app-core module finds the registry | Medium | Agreed with task-owner, not user-confirmed: project id (8 hex) in URLs/API, name for display; app-core module uses `defaultRegistryDir(process.env)` + `resolveReference` + `mainPath` (no cwd) |
+| 28 | Several paths: cwd for events and `ctx.project.path` from a non-main worktree; virtual projects (no cwd) and events | High | Resolved (Decision #25; virtual projects: Decision #5). Proposal sent to owners, not user-confirmed: virtual projects are config-only, a command that needs a path or emits an event fails with `VirtualProjectError` |
+| 29 | Inheritance chain: where a write (`task type add`) goes, and cross-level validation (e.g. at most one default status) | Medium | Agreed with task-owner, not user-confirmed: a write goes to the project's own layer; cross-level validation stays in the tool after the merge |
+| 30 | Do lock + atomic write cover tool data (task-index.json read-modify-write), or only the registry | Medium | Decided in the SDK (v1): the registry lock protects only the registry files; tool data consistency is the tool's own concern; `withRegistryLock` and `writeFileAtomic` stay exported |
 | 22 | Name of each project's folder in the config dir (id, name slug, or both); must stay valid when a name/alias is renamed | High | Resolved (Decision #15) |
 | 18 | `project-sdk` versioning and pinning (queue-sdk model vs singleton-daemon-kit model) | Medium | Resolved (Decision #18: CalVer + "latest", like app-core-sdk) |
 | 21 | Daemons (flow, queue) are shared by all clients: what happens when a client uses a different registry location than the one the daemon started with (test vs production) | High | Deferred (Decision #16); owner findings in file 10 (queue-owner replied; flow-owner request withdrawn) |
@@ -107,6 +107,7 @@ Introduce a "project" concept: a base folder (usually a git repo, not required) 
 | v0.2 | 2026-10-24 | Decision #1: structure C |
 | v0.3 | 2026-10-24 | Decision #2: generated id + unique name |
 | v0.4 | 2026-10-24 | Decision #3: registry-only resolution, no marker |
+| v0.24 | 2026-10-24 | SDK and CLI published; Q27, Q29, Q30 agreed with owners; Q31 proposal detailed; push may carry an explicit project id |
 | v0.23 | 2026-10-24 | Decision #27: SDK and mini CLI implemented and verified |
 | v0.22 | 2026-10-24 | Decisions #24-#26: remove parent needs --recursive, cwd = where you are, validation on write only; #13 and #18 confirmed |
 | v0.21 | 2026-10-24 | Decisions #18-#23: project-sdk name and CalVer/latest, soft delete, CLI consistency, per-CLI default-project env, git repo field, default location; question 32 added |

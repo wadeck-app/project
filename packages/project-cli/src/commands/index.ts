@@ -1,5 +1,6 @@
 import type { Command } from '../command.js';
 import { addCommand } from './add.js';
+import { CLI_COMMANDS } from './cli.js';
 import { aliasAddCommand, aliasRemoveCommand } from './alias.js';
 import { gitClearCommand, gitSetCommand } from './git.js';
 import { listCommand } from './list.js';
@@ -30,4 +31,5 @@ export const COMMANDS: Command[] = [
   pathsMoveCommand,
   pathsMainCommand,
   removeCommand,
+  ...CLI_COMMANDS,
 ];

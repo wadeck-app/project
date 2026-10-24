@@ -9,3 +9,11 @@ export class UsageError extends Error {
     this.command = command;
   }
 }
+
+/** A command failed for a reason the user can act on (exit code 1, message only, no stack). */
+export class CliError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CliError';
+  }
+}

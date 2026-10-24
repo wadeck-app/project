@@ -278,3 +278,30 @@ describe('end-to-end: failures and isolation', () => {
     expect(usage.stderr).toContain("Run 'project --help' for usage.");
   });
 });
+
+describe('end-to-end: the update notice', () => {
+  let sandbox: Sandbox;
+
+  beforeAll(() => {
+    sandbox = makeSandbox();
+    mkdirSync(sandbox.registryDir, { recursive: true });
+  });
+  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+
+  const stateFile = () => join(sandbox.registryDir, 'update-state.json');
+
+  it('tells once, on stderr, that a background update installed a new version', async () => {
+    writeFileSync(stateFile(), JSON.stringify({ status: 'success', targetVersion: '2026.10.25-001-abc', timestamp: 1 }));
+    const first = await sandbox.cli(['list', '--json']);
+    expect(first.stderr).toContain('[project] Updated to v2026.10.25-001-abc');
+    expect(JSON.parse(first.stdout)).toEqual([]);
+    const second = await sandbox.cli(['list', '--json']);
+    expect(second.stderr).not.toContain('Updated to');
+  });
+
+  it('tells that a background update failed, with its reason and what to run', async () => {
+    writeFileSync(stateFile(), JSON.stringify({ status: 'failed', error: 'npm root -g failed', timestamp: 1 }));
+    const result = await sandbox.cli(['list', '--json']);
+    expect(result.stderr).toContain('[project] Background update failed (npm root -g failed). Run: project cli update');
+  });
+});

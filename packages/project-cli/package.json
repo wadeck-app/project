@@ -1,38 +1,28 @@
 {
-  "name": "@wadeck-app/project-cli",
+  "name": "project-cli",
   "version": "0.0.1",
-  "description": "The project command: register, inspect and resolve the projects shared by the task, flow and queue CLIs",
+  "description": "Source package of the project command. Published as the generated @wadeck-app/project-cli (see ci/)",
+  "private": true,
   "type": "module",
-  "bin": {
-    "project": "./dist/main.js"
-  },
-  "files": [
-    "dist",
-    "!dist/**/*.tsbuildinfo",
-    "!dist/**/*.d.ts",
-    "README.md"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/wadeck-app/project.git",
-    "directory": "packages/project-cli"
-  },
-  "publishConfig": {
-    "@wadeck-app:registry": "https://npm.pkg.github.com/",
-    "access": "public"
-  },
   "scripts": {
     "build": "tsc --build tsconfig.json",
+    "bundle": "tsx ci/scripts/bundle.ts",
+    "build-launcher": "node ci/scripts/build-launcher.mjs",
     "test": "vitest run --bail=1",
     "test:watch": "vitest",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist dist-bundle launcher-go"
   },
   "dependencies": {
-    "@wadeck-app/project-sdk": "*"
+    "@wadeck-app/project-sdk": "*",
+    "@wadeck-app/shared-cli": "latest",
+    "@wadeck-app/shared-updater": "latest"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "@wadeck-app/singleton-daemon-kit": "latest",
+    "esbuild": "^0.27.2",
     "rimraf": "^6.0.1",
+    "tsx": "^4.7.0",
     "typescript": "^7.0.0",
     "vitest": "^4.0.14"
   },

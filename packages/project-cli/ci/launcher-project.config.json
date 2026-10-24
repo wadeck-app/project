@@ -1,0 +1,1 @@
+{ "appName": "project", "displayName": "Project CLI", "nodeScript": "project.cjs", "defaultConfigDir": "project", "cliFlags": [] }

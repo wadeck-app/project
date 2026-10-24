@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readVersion } from './version.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { currentVersion, readVersion } from './version.js';
 
 describe('readVersion', () => {
   let dir: string;
@@ -38,5 +38,25 @@ describe('readVersion', () => {
 
   it('fails loudly when there is no version string', () => {
     expect(() => readVersion(fileWith('{"name":"x"}'))).toThrow(/package\.json has no "version" string/);
+  });
+});
+
+describe('currentVersion', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('is the version stamped at bundle time when there is one', () => {
+    vi.stubGlobal('__PROJECT_CLI_VERSION__', '2026.10.24-004-abcdef12');
+    expect(currentVersion()).toBe('2026.10.24-004-abcdef12');
+  });
+
+  it('is the version of package.json in a build that was not stamped (tsc, tests)', () => {
+    expect(currentVersion()).toBe(readVersion());
+  });
+
+  it('ignores an empty stamp instead of reporting an empty version', () => {
+    vi.stubGlobal('__PROJECT_CLI_VERSION__', '');
+    expect(currentVersion()).toBe(readVersion());
   });
 });

@@ -20,3 +20,11 @@ export function readVersion(file: URL = PACKAGE_JSON): string {
   }
   return version;
 }
+
+// Injected by esbuild (define) when the CLI is bundled; absent in a plain tsc build and in tests.
+declare const __PROJECT_CLI_VERSION__: string | undefined;
+
+/** The version of the running CLI: the one stamped at bundle time, else the one of package.json. */
+export function currentVersion(): string {
+  return typeof __PROJECT_CLI_VERSION__ === 'string' && __PROJECT_CLI_VERSION__ !== '' ? __PROJECT_CLI_VERSION__ : readVersion();
+}

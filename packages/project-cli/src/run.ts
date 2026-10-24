@@ -3,13 +3,13 @@ import { parseArgs } from './args.js';
 import type { Command, CommandOutput, Context, Io } from './command.js';
 import { COMMANDS } from './commands/index.js';
 import { type Dispatch, splitCommand } from './dispatch.js';
-import { UsageError } from './errors.js';
+import { CliError, UsageError } from './errors.js';
 import { argsSyntax, commandHelp, groupHelp, topHelp } from './help.js';
 import { hintFor } from './hints.js';
 import { lockOptions } from './lockNotice.js';
 import { optionsOf } from './options.js';
 import { resolveTarget } from './target.js';
-import { readVersion } from './version.js';
+import { currentVersion } from './version.js';
 
 const EXIT_ERROR = 1;
 const EXIT_USAGE = 2;
@@ -29,7 +29,7 @@ function withoutCommand(argv: readonly string[], dispatch: Dispatch, io: Io): nu
   const [first, second] = dispatch.words;
   if (first === undefined) {
     if (argv.includes('--version')) {
-      return print(io, [readVersion()]);
+      return print(io, [currentVersion()]);
     }
     if (wantsHelp(argv)) {
       return print(io, topHelp(COMMANDS));
@@ -78,7 +78,11 @@ async function execute(command: Command, rest: readonly string[], io: Io, env: N
   } else {
     output = await command.run(context, resolveTarget(context, ref, label), args);
   }
-  return print(io, parsed.options.flag('json') ? [JSON.stringify(output.json, null, 2)] : output.lines);
+  if (parsed.options.flag('json')) {
+    // A command that wrote its own output has no result to print.
+    return print(io, output.json === undefined ? [] : [JSON.stringify(output.json, null, 2)]);
+  }
+  return print(io, output.lines);
 }
 
 function report(error: unknown, io: Io): number {
@@ -86,6 +90,10 @@ function report(error: unknown, io: Io): number {
     io.err(`error: ${error.message}`);
     io.err(`Run '${error.command} --help' for usage.`);
     return EXIT_USAGE;
+  }
+  if (error instanceof CliError) {
+    io.err(`error: ${error.message}`);
+    return EXIT_ERROR;
   }
   if (error instanceof ProjectError) {
     io.err(`error: ${error.message}`);

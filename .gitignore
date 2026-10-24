@@ -9,3 +9,6 @@ dist-types/
 _secrets_/
 # Git Bash (MSYS2) crash dumps
 *.stackdump
+# Go launcher binaries and the packages generated for publishing (ci/scripts)
+launcher-go/
+packages/project-cli-*/
