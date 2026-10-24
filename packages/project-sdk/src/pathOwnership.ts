@@ -1,5 +1,5 @@
 import { PathOwnedError } from './errors.js';
-import { normalizePath, pathKey } from './paths.js';
+import { normalizePath, pathKey, toNativePath } from './paths.js';
 import { describeProject } from './projects.js';
 import { realPathKey } from './realPath.js';
 import type { Project, Registry } from './types.js';
@@ -24,7 +24,7 @@ export function assertPathFree(registry: Registry, path: string): string {
   const owner = findPathOwner(registry, normalized);
   if (owner !== undefined) {
     throw new PathOwnedError(
-      `path ${normalized} is already registered by project ${describeProject(owner)}; a path belongs to exactly one project, ` +
+      `path ${toNativePath(normalized)} is already registered by project ${describeProject(owner)}; a path belongs to exactly one project, ` +
         'use that project or remove the path from it first',
     );
   }

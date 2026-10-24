@@ -44,11 +44,19 @@ export function assertDirectory(path: string): void {
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === 'ENOENT' || code === 'ENOTDIR') {
-      throw new InvalidPathError(`path ${path} does not exist; create the folder first or register an existing directory`, path);
+      throw new InvalidPathError(`path ${toNativePath(path)} does not exist; create the folder first or register an existing directory`, path);
     }
-    throw new InvalidPathError(`path ${path} cannot be read (${code ?? String(error)}); check its permissions`, path);
+    throw new InvalidPathError(`path ${toNativePath(path)} cannot be read (${code ?? String(error)}); check its permissions`, path);
   }
   if (!isDirectory) {
-    throw new InvalidPathError(`path ${path} is not a directory; register the folder that contains it`, path);
+    throw new InvalidPathError(`path ${toNativePath(path)} is not a directory; register the folder that contains it`, path);
   }
+}
+
+/**
+ * A stored path as the user's platform writes it, for messages: backslashes on Windows. Paths are stored with forward slashes
+ * (normalizePath) and `--json` outputs keep that form; this is for what people read and copy.
+ */
+export function toNativePath(path: string, platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32' ? path.replace(/\//g, '\\') : path;
 }

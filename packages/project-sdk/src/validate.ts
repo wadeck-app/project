@@ -2,7 +2,7 @@ import { getChain } from './chain.js';
 import { InvalidPathError, RegistryInvalidError } from './errors.js';
 import { isIdLike } from './ids.js';
 import { type LabelKind, normalizeLabel } from './labels.js';
-import { assertDirectory, normalizePath, pathKey } from './paths.js';
+import { assertDirectory, normalizePath, pathKey, toNativePath } from './paths.js';
 import type { Project, Registry } from './types.js';
 import { describeProject } from './projects.js';
 import { validateProjectLabels } from './projectLabels.js';
@@ -87,7 +87,7 @@ function checkPaths(projects: Project[], toCheck: boolean | readonly string[]): 
       const owner = owners.get(key);
       if (owner !== undefined) {
         throw new RegistryInvalidError(
-          `path '${entry.path}' is registered by ${describe(owner)} and by ${describe(project)}; a path belongs to exactly one project, remove it from one of them`,
+          `path '${toNativePath(entry.path)}' is registered by ${describe(owner)} and by ${describe(project)}; a path belongs to exactly one project, remove it from one of them`,
         );
       }
       owners.set(key, project);
@@ -100,7 +100,7 @@ function checkPaths(projects: Project[], toCheck: boolean | readonly string[]): 
         const other = realOwners.get(real);
         if (other !== undefined && (checked || other.checked)) {
           throw new RegistryInvalidError(
-            `paths '${other.path}' (${describe(other.project)}) and '${entry.path}' (${describe(project)}) are the same folder reached through a link, junction or short name; ` +
+            `paths '${toNativePath(other.path)}' (${describe(other.project)}) and '${toNativePath(entry.path)}' (${describe(project)}) are the same folder reached through a link, junction or short name; ` +
               'a path belongs to exactly one project, remove one of them',
           );
         }

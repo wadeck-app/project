@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AmbiguousReferenceError, NoProjectInScopeError, ProjectNotFoundError, VirtualProjectError } from './errors.js';
 import { describeResolution, findProjectForPath, requirePath, resolveScope } from './resolution.js';
+import { toNativePath } from './paths.js';
 import { makeProject, makeRegistry } from './testHelpers.js';
 
 const isWin = process.platform === 'win32';
@@ -113,7 +114,7 @@ describe('resolveScope', () => {
     })();
     expect(error).toBeInstanceOf(NoProjectInScopeError);
     expect(error.message).toBe(
-      `no project in scope for ${base}/blog. Registered: shop, nested, shared`,
+      `no project in scope for ${toNativePath(`${base}/blog`)}. Registered: shop, nested, shared`,
     );
   });
 

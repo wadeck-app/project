@@ -17,7 +17,7 @@ export {
 } from './projectLabels.js';
 export { MAX_PROJECT_LABELS } from './projectLabels.js';
 export { addLabels, removeLabels } from './labelMutations.js';
-export { assertDirectory, isSameOrInside, normalizePath, pathKey } from './paths.js';
+export { assertDirectory, isSameOrInside, normalizePath, pathKey, toNativePath } from './paths.js';
 
 export { writeFileAtomic, type AtomicWriteOptions } from './atomicWrite.js';
 export { type LockHandle, type LockOptions, type LockWaitInfo, lockFilePath, withRegistryLock } from './lock.js';

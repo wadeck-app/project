@@ -3,7 +3,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { InvalidPathError } from './errors.js';
-import { assertDirectory, isSameOrInside, normalizePath, pathKey } from './paths.js';
+import { assertDirectory, isSameOrInside, normalizePath, pathKey, toNativePath } from './paths.js';
 
 const isWin = process.platform === 'win32';
 
@@ -119,5 +119,23 @@ describe('base argument', () => {
 
   it('keeps defaulting to the process cwd', () => {
     expect(normalizePath('x')).toBe(normalizePath(join(process.cwd(), 'x')));
+  });
+});
+
+describe('toNativePath', () => {
+  it('shows backslashes on win32 and leaves the path alone elsewhere (the stored form always has forward slashes)', () => {
+    expect(toNativePath('C:/Users/me/work/shop', 'win32')).toBe('C:\\Users\\me\\work\\shop');
+    expect(toNativePath('C:/', 'win32')).toBe('C:\\');
+    expect(toNativePath('/home/me/shop', 'linux')).toBe('/home/me/shop');
+    expect(toNativePath('/Users/me/shop', 'darwin')).toBe('/Users/me/shop');
+  });
+
+  it('keeps the backslashes of a path that is already native, and an empty path', () => {
+    expect(toNativePath('C:\\a\\b', 'win32')).toBe('C:\\a\\b');
+    expect(toNativePath('', 'win32')).toBe('');
+  });
+
+  it('defaults to the platform it runs on', () => {
+    expect(toNativePath('/a/b')).toBe(isWin ? '\\a\\b' : '/a/b');
   });
 });

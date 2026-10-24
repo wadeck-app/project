@@ -1,6 +1,6 @@
 import { loadRegistry } from '@wadeck-app/project-sdk';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type Harness, makeHarness } from '../testHelpers.js';
+import { type Harness, makeHarness, native } from '../testHelpers.js';
 
 describe('read commands', () => {
   let h: Harness;
@@ -39,7 +39,9 @@ describe('read commands', () => {
       const result = await h.cli(['list']);
       const lines = result.out.split('\n');
       expect(lines[0]).toMatch(/^ID\s+NAME\s+ALIASES\s+PARENT\s+LABELS\s+MAIN PATH$/);
-      expect(lines.find((l) => l.includes(idOf('shop')))).toMatch(new RegExp(`${idOf('shop')}\\s+shop\\s+sh\\s+base\\s+-\\s+${shop}$`));
+      const shopLine = lines.find((l) => l.includes(idOf('shop')))!;
+      expect(shopLine).toMatch(new RegExp(`${idOf('shop')}\\s+shop\\s+sh\\s+base\\s+-\\s+`));
+      expect(shopLine.endsWith(native(shop))).toBe(true);
       expect(lines.find((l) => l.includes(idOf('base')))).toMatch(/base\s+-\s+-\s+-\s+\(virtual\)$/);
     });
 
@@ -60,16 +62,16 @@ describe('read commands', () => {
         '  labels: none',
         `  parent chain: base > shop`,
         '  paths:',
-        `    ${shop} (main)`,
-        `    ${wt}`,
+        `    ${native(shop)} (main)`,
+        `    ${native(wt)}`,
         '  git: git@x:shop.git',
-        `  folder: ${h.registryDir.replace(/\\/g, '/')}/projects/${idOf('shop')}`,
+        `  folder: ${native(`${h.registryDir.replace(/\\/g, '/')}/projects/${idOf('shop')}`)}`,
       ]);
     });
 
     it('states how the project was found on stderr, first', async () => {
       const result = await h.cli(['show', 'sh']);
-      expect(result.err).toBe(`project: shop (${idOf('shop')}) via <ref> argument, path ${shop} (main); registry: ${h.registryDir}`);
+      expect(result.err).toBe(`project: shop (${idOf('shop')}) via <ref> argument, path ${native(shop)} (main); registry: ${h.registryDir}`);
     });
 
     it('shows a virtual project without alias, parent or git', async () => {
@@ -109,7 +111,7 @@ describe('read commands', () => {
     it('reports the cwd and the registered path that contains it', async () => {
       const sub = h.dir('shop/src/deep');
       const result = await h.cli(['resolve'], { cwd: sub });
-      expect(result.out.split('\n')).toEqual([`project: shop (${idOf('shop')})`, 'labels: none', 'source: cwd', `path: ${shop} (cwd)`, `registry: ${h.registryDir}`]);
+      expect(result.out.split('\n')).toEqual([`project: shop (${idOf('shop')})`, 'labels: none', 'source: cwd', `path: ${native(shop)} (cwd)`, `registry: ${h.registryDir}`]);
     });
 
     it('uses the second path when the cwd is inside it', async () => {
@@ -142,10 +144,10 @@ describe('read commands', () => {
       const result = await h.cli(['resolve'], { cwd: elsewhere });
       expect(result.code).toBe(1);
       expect(result.out).toBe('');
-      expect(result.err).toContain(`error: no project in scope for ${elsewhere}`);
+      expect(result.err).toContain(`error: no project in scope for ${native(elsewhere)}`);
       expect(result.err).toContain('Registered: base, shop');
       expect(result.err).toContain(`
-hint: pass a project reference, or register this folder with: project add "${elsewhere}"`);
+hint: pass a project reference, or register this folder with: project add "${native(elsewhere)}"`);
     });
 
     it('fails on a typo with a suggestion and never selects it', async () => {

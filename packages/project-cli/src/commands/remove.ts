@@ -1,4 +1,4 @@
-import { describeProject, removeProject } from '@wadeck-app/project-sdk';
+import { describeProject, removeProject, toNativePath } from '@wadeck-app/project-sdk';
 import type { TargetCommand } from '../command.js';
 import { projectFolder } from '../format.js';
 
@@ -12,7 +12,7 @@ export const removeCommand: TargetCommand = {
     const removed = await removeProject(context.registryDir, scope.project.id, { recursive: context.options.flag('recursive') }, { lock: context.lock });
     return {
       json: removed,
-      lines: removed.map((p) => `removed ${describeProject(p)}; its data folder was kept: ${projectFolder(context.registryDir, p)}`),
+      lines: removed.map((p) => `removed ${describeProject(p)}; its data folder was kept: ${toNativePath(projectFolder(context.registryDir, p))}`),
       mutation: `remove ${removed.map(describeProject).join(', ')}`,
     };
   },

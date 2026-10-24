@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { normalizePath } from '@wadeck-app/project-sdk';
+import { normalizePath, toNativePath } from '@wadeck-app/project-sdk';
 import { run } from './run.js';
 
 export interface Outcome {
@@ -45,3 +45,6 @@ export function makeHarness(): Harness {
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
 }
+
+/** A stored path as the CLI prints it for people: backslashes on Windows (see toNativePath in the SDK). */
+export const native = (path: string): string => toNativePath(path);

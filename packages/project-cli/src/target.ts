@@ -1,4 +1,4 @@
-import { describeResolution, loadRegistry, resolveScope } from '@wadeck-app/project-sdk';
+import { describeResolution, loadRegistry, resolveScope, toNativePath } from '@wadeck-app/project-sdk';
 import type { Context, Target } from './command.js';
 import { UsageError } from './errors.js';
 import { PROJECT_ENV } from './options.js';
@@ -19,8 +19,10 @@ export function resolveTarget(context: Context, ref: string | undefined, label: 
     ...(context.env[PROJECT_ENV] === undefined ? {} : { env: context.env[PROJECT_ENV] }),
     envName: PROJECT_ENV,
   });
-  const line = describeResolution(scope, { registryDir: context.registryDir });
-  context.io.err(line);
-  context.log.resolution(line);
+  const stored = describeResolution(scope, { registryDir: context.registryDir });
+  // The user reads the native form; the log keeps the stored one.
+  const shown = describeResolution(scope.path === undefined ? scope : { ...scope, path: toNativePath(scope.path) }, { registryDir: context.registryDir });
+  context.io.err(shown);
+  context.log.resolution(stored);
   return { registry, scope };
 }

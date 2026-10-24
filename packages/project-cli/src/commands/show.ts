@@ -1,4 +1,4 @@
-import { describeProject, getChain } from '@wadeck-app/project-sdk';
+import { describeProject, getChain, toNativePath } from '@wadeck-app/project-sdk';
 import type { TargetCommand } from '../command.js';
 import { forJson, labelList, pathLines, projectFolder } from '../format.js';
 
@@ -22,7 +22,7 @@ export const showCommand: TargetCommand = {
         '  paths:',
         ...pathLines(project, '    '),
         `  git: ${project.git ?? 'none'}`,
-        `  folder: ${folder}`,
+        `  folder: ${toNativePath(folder)}`,
       ],
     };
   },

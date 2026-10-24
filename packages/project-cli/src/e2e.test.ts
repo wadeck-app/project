@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realp
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type Project, loadDeleted, loadRegistry, normalizePath, validateRegistry } from '@wadeck-app/project-sdk';
+import { type Project, loadDeleted, loadRegistry, normalizePath, toNativePath, validateRegistry } from '@wadeck-app/project-sdk';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -110,10 +110,10 @@ describe('end-to-end: a shop project with a worktree and a shared base', () => {
     const unrelated = await sandbox.cli(['resolve'], elsewhere);
     expect(unrelated.code).toBe(1);
     expect(unrelated.stdout).toBe('');
-    expect(unrelated.stderr).toContain(`error: no project in scope for ${elsewhere}`);
+    expect(unrelated.stderr).toContain(`error: no project in scope for ${toNativePath(elsewhere)}`);
     expect(unrelated.stderr).toContain('Registered: shop');
     expect(unrelated.stderr).toContain(`
-hint: pass a project reference, or register this folder with: project add "${elsewhere}"`);
+hint: pass a project reference, or register this folder with: project add "${toNativePath(elsewhere)}"`);
   });
 
   it('3b. resolves from a cwd reached through a junction (symlink on POSIX) and refuses to register it as another project', async () => {
@@ -150,10 +150,10 @@ hint: pass a project reference, or register this folder with: project add "${els
     expect(list.stderr).toBe(`registry: ${sandbox.registryDir}`);
     const show = await sandbox.cli(['show', 'shop', '--json'], elsewhere);
     expect(JSON.parse(show.stdout)).toMatchObject({ name: 'shop', chain: [{ name: 'base' }, { name: 'shop' }] });
-    expect(show.stderr).toBe(`project: shop (${projectNamed(sandbox, 'shop').id}) via <ref> argument, path ${shop} (main); registry: ${sandbox.registryDir}`);
+    expect(show.stderr).toBe(`project: shop (${projectNamed(sandbox, 'shop').id}) via <ref> argument, path ${toNativePath(shop)} (main); registry: ${sandbox.registryDir}`);
     const resolve = await sandbox.cli(['resolve', '--json'], worktree);
     expect(JSON.parse(resolve.stdout).name).toBe('shop');
-    expect(resolve.stderr).toBe(`project: shop (${projectNamed(sandbox, 'shop').id}) via cwd, path ${worktree} (cwd); registry: ${sandbox.registryDir}`);
+    expect(resolve.stderr).toBe(`project: shop (${projectNamed(sandbox, 'shop').id}) via cwd, path ${toNativePath(worktree)} (cwd); registry: ${sandbox.registryDir}`);
   });
 
   it('6. refuses to remove a parent, then soft-deletes both and keeps the data folders', async () => {

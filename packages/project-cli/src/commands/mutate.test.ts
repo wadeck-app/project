@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { type Project, loadDeleted, loadRegistry } from '@wadeck-app/project-sdk';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type Harness, makeHarness } from '../testHelpers.js';
+import { type Harness, makeHarness, native } from '../testHelpers.js';
 
 describe('mutating commands', () => {
   let h: Harness;
@@ -120,7 +120,7 @@ describe('mutating commands', () => {
       const wt = h.dir('wt');
       const added = await h.cli(['paths', 'add', 'shop', 'wt']);
       expect(added.code).toBe(0);
-      expect(added.out.split('\n')).toEqual([`added path ${wt} to shop (${project('shop').id})`, '  paths:', `    ${shop} (main)`, `    ${wt}`]);
+      expect(added.out.split('\n')).toEqual([`added path ${native(wt)} to shop (${project('shop').id})`, '  paths:', `    ${native(shop)} (main)`, `    ${native(wt)}`]);
       await h.cli(['paths', 'main', 'shop', wt]);
       expect(project('shop').paths).toEqual([
         { path: shop, main: false },
@@ -165,7 +165,7 @@ describe('mutating commands', () => {
     it('exits 1 when the path is not one of the project, listing its paths', async () => {
       const result = await h.cli(['paths', 'main', 'shop', h.dir('nowhere')]);
       expect(result.code).toBe(1);
-      expect(result.err).toContain(`registered paths: ${shop}`);
+      expect(result.err).toContain(`registered paths: ${native(shop)}`);
     });
   });
 
@@ -176,7 +176,7 @@ describe('mutating commands', () => {
       mkdirSync(folder, { recursive: true });
       const result = await h.cli(['remove', 'shop']);
       expect(result.code).toBe(0);
-      expect(result.out).toBe(`removed shop (${id}); its data folder was kept: ${h.registryDir.replace(/\\/g, '/')}/projects/${id}`);
+      expect(result.out).toBe(`removed shop (${id}); its data folder was kept: ${native(`${h.registryDir.replace(/\\/g, '/')}/projects/${id}`)}`);
       expect(loadRegistry(h.registryDir).projects).toEqual([]);
       expect(loadDeleted(h.registryDir).projects.map((p) => p.id)).toEqual([id]);
       expect(existsSync(folder)).toBe(true);

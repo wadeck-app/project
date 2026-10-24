@@ -1,6 +1,6 @@
 import { InvalidPathError, MainPathError } from './errors.js';
 import { assertPathFree } from './pathOwnership.js';
-import { assertDirectory, normalizePath, pathKey } from './paths.js';
+import { assertDirectory, normalizePath, pathKey, toNativePath } from './paths.js';
 import { resolveReference } from './references.js';
 import type { Project, ProjectPath } from './types.js';
 import { type MutationOptions, updateRegistry } from './update.js';
@@ -10,9 +10,9 @@ function ownPath(project: Project, path: string): ProjectPath {
   const key = pathKey(path);
   const entry = project.paths.find((p) => pathKey(p.path) === key);
   if (entry === undefined) {
-    const known = project.paths.length > 0 ? project.paths.map((p) => p.path).join(', ') : 'none';
+    const known = project.paths.length > 0 ? project.paths.map((p) => toNativePath(p.path)).join(', ') : 'none';
     throw new InvalidPathError(
-      `project ${describeProject(project)} does not have path ${normalizePath(path)} (registered paths: ${known}); nothing was changed`,
+      `project ${describeProject(project)} does not have path ${toNativePath(normalizePath(path))} (registered paths: ${known}); nothing was changed`,
       normalizePath(path),
     );
   }
@@ -56,13 +56,13 @@ export function removePath(registryDir: string, ref: string, path: string, flags
       if (flags.newMain !== undefined) {
         const replacement = ownPath(project, flags.newMain);
         if (replacement === removed) {
-          throw new InvalidPathError(`the new main path ${replacement.path} is the path being removed; name another path of project ${project.name}`, replacement.path);
+          throw new InvalidPathError(`the new main path ${toNativePath(replacement.path)} is the path being removed; name another path of project ${project.name}`, replacement.path);
         }
         project.paths = remaining;
         makeMain(project, replacement);
       } else if (removed.main && remaining.length > 0) {
         throw new MainPathError(
-          `${removed.path} is the main path of project ${describeProject(project)} and other paths exist (${remaining.map((p) => p.path).join(', ')}); ` +
+          `${toNativePath(removed.path)} is the main path of project ${describeProject(project)} and other paths exist (${remaining.map((p) => toNativePath(p.path)).join(', ')}); ` +
             'name a new main path, or set another main path first',
         );
       } else {

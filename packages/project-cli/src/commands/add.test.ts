@@ -1,6 +1,6 @@
 import { loadRegistry } from '@wadeck-app/project-sdk';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type Harness, makeHarness } from '../testHelpers.js';
+import { type Harness, makeHarness, native } from '../testHelpers.js';
 
 describe('project add', () => {
   let h: Harness;
@@ -16,7 +16,7 @@ describe('project add', () => {
     const [project] = loadRegistry(h.registryDir).projects;
     expect(result.code).toBe(0);
     expect(project).toMatchObject({ name: 'shop', aliases: [], paths: [{ path: cwd, main: true }] });
-    expect(result.out).toBe(`added shop (${project!.id})\n  path: ${cwd} (main)`);
+    expect(result.out).toBe(`added shop (${project!.id})\n  path: ${native(cwd)} (main)`);
   });
 
   it('first states the registry in use on stderr', async () => {

@@ -8,7 +8,7 @@ import * as sdk from './index.js';
 const here = dirname(fileURLToPath(import.meta.url));
 
 const FUNCTIONS = [
-  'defaultRegistryDir', 'projectDir', 'mainPath', 'isVirtual', 'describeProject', 'deriveName', 'parseLabel', 'formatLabel', 'normalizeProjectLabel', 'labelsOf', 'hasLabel', 'matchesSelectors', 'filterProjects', 'addLabels', 'removeLabels', 'generateId', 'isIdLike', 'normalizeLabel', 'normalizePath', 'pathKey', 'isSameOrInside', 'assertDirectory',
+  'defaultRegistryDir', 'projectDir', 'mainPath', 'isVirtual', 'describeProject', 'deriveName', 'parseLabel', 'formatLabel', 'normalizeProjectLabel', 'labelsOf', 'hasLabel', 'matchesSelectors', 'filterProjects', 'addLabels', 'removeLabels', 'generateId', 'isIdLike', 'normalizeLabel', 'normalizePath', 'toNativePath', 'pathKey', 'isSameOrInside', 'assertDirectory',
   'writeFileAtomic', 'withRegistryLock', 'lockFilePath',
   'loadRegistry', 'loadDeleted', 'registryFilePath', 'deletedFilePath', 'validateRegistry',
   'addProject', 'renameProject', 'addAlias', 'removeAlias', 'setParent', 'setGit', 'removeProject',

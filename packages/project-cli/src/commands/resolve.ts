@@ -1,4 +1,4 @@
-import { describeProject } from '@wadeck-app/project-sdk';
+import { describeProject, toNativePath } from '@wadeck-app/project-sdk';
 import type { TargetCommand } from '../command.js';
 import { labelList } from '../format.js';
 
@@ -16,7 +16,7 @@ export const resolveCommand: TargetCommand = {
         `project: ${describeProject(project)}`,
         `labels: ${labelList(project)}`,
         `source: ${via}`,
-        `path: ${path === undefined ? 'none (virtual project)' : `${path} (${pathVia})`}`,
+        `path: ${path === undefined ? 'none (virtual project)' : `${toNativePath(path)} (${pathVia})`}`,
         `registry: ${context.registryDir}`,
       ],
     };

@@ -21,6 +21,7 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
 - id: 8 lowercase hex chars. Name/alias: `^[a-z][a-z0-9._-]*$`, max 64, stored lowercase, never id-shaped.
 - Names, aliases and ids are unique across live projects, case-insensitive.
 - A path belongs to one project; a project with paths has exactly one `main` (the first added); 0 paths = virtual project (`isVirtual`).
+- Paths are stored with forward slashes; error messages, the NoProjectInScopeError hint included, show them in the native form (`toNativePath`: backslashes on Windows), while the data of the errors (`cwd`, `path`) stays as stored.
 - Paths stay purely string-based (`normalizePath`, `pathKey`), but matching also compares real folders (`fs.realpathSync.native`): a cwd reached through a junction, symlink or 8.3 short name resolves, and registering a link to a folder another project owns is refused. A registered path that no longer exists is matched by its normalized path only.
 - Reads (`loadRegistry`) take no lock and skip full validation. A missing `registry.json` (or `deleted_projects.json`) is the first-use state: an empty registry, nothing is created. Every mutation: lock, load, change, `validateRegistry`, atomic write.
 - `removeProject` is a soft delete; `projects/<id>/` is never deleted.
@@ -38,7 +39,7 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
 | Inheritance | `getChain`, `getConfigLayers`, `projectToolDir(registryDir, id, tool, 'config' or 'data', { ensure })` |
 | Config helpers | `validateLayer`, `mergeLayers(schema, layers)`, root-first with the project's own layer last; `ConfigSchema` scopes `global`, `local`, `inherit`; merges `replace`, `deep`, `append`; the CLIs parse the files |
 | Infra | `withRegistryLock`, `writeFileAtomic`, `lockFilePath` |
-| Helpers | `normalizePath(path, base?)`, `pathKey(path, base?)`, `isSameOrInside`, `assertDirectory`, `generateId`, `isIdLike`, `normalizeLabel`, `deriveName(path)`, `describeProject(project)`, `mainPath(project)`, `isVirtual(project)`, `levenshtein` |
+| Helpers | `toNativePath(path, platform?)`, `normalizePath(path, base?)`, `pathKey(path, base?)`, `isSameOrInside`, `assertDirectory`, `generateId`, `isIdLike`, `normalizeLabel`, `deriveName(path)`, `describeProject(project)`, `mainPath(project)`, `isVirtual(project)`, `levenshtein` |
 
 Mutations return the updated `Project` (`removeProject` returns the deleted entries) and accept a trailing `{ lock: { timeoutMs, staleMs, retryMs, onWait } }`; `onWait` is how a CLI prints "waiting for lock held by pid N"; it also fires for a stale lock (`stale: true`) that is about to be taken over.
 

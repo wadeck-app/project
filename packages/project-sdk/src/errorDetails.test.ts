@@ -9,7 +9,7 @@ import {
   ProjectNotFoundError,
   VirtualProjectError,
 } from './errors.js';
-import { assertDirectory, normalizePath } from './paths.js';
+import { assertDirectory, normalizePath, toNativePath } from './paths.js';
 import { addPath, removePath } from './pathMutations.js';
 import { addProject } from './projectMutations.js';
 import { assertLabelsFree } from './labels.js';
@@ -140,8 +140,8 @@ describe('the message when no project is in scope', () => {
   it('lists the projects as name (alias a, b) and quotes the path of the suggested command', () => {
     const base = process.platform === 'win32' ? 'C:/my work' : '/my work';
     const error = caught(() => resolveScope(aliased, { cwd: base })) as NoProjectInScopeError;
-    expect(error.message).toBe(`no project in scope for ${normalizePath(base)}. Registered: shop (alias sh, store), blog`);
+    expect(error.message).toBe(`no project in scope for ${toNativePath(normalizePath(base))}. Registered: shop (alias sh, store), blog`);
     expect(error.message).not.toMatch(/--project|project add/);
-    expect(error.hint).toBe(`pass a project reference, or register this folder with: project add "${normalizePath(base)}"`);
+    expect(error.hint).toBe(`pass a project reference, or register this folder with: project add "${toNativePath(normalizePath(base))}"`);
   });
 });

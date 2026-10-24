@@ -1,5 +1,5 @@
 import { NoProjectInScopeError, VirtualProjectError } from './errors.js';
-import { normalizePath } from './paths.js';
+import { normalizePath, toNativePath } from './paths.js';
 import { cwdKeys, containmentLength } from './realPath.js';
 import { resolveReference } from './references.js';
 import type { Project, ProjectPath, Registry } from './types.js';
@@ -79,11 +79,11 @@ function noProject(registry: Registry, cwd: string): NoProjectInScopeError {
         ? `${entries.slice(0, MAX_LISTED_PROJECTS).join(', ')}, ... (${entries.length - MAX_LISTED_PROJECTS} more)`
         : entries.join(', ');
   return new NoProjectInScopeError(
-    `no project in scope for ${cwd}. Registered: ${listed}`,
+    `no project in scope for ${toNativePath(cwd)}. Registered: ${listed}`,
     {
       cwd,
       registered: registry.projects.map((p) => p.name),
-      hint: `pass a project reference, or register this folder with: project add "${cwd}"`,
+      hint: `pass a project reference, or register this folder with: project add "${toNativePath(cwd)}"`,
     },
   );
 }
