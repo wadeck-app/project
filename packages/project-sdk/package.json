@@ -1,0 +1,46 @@
+{
+  "name": "@wadeck-app/project-sdk",
+  "version": "0.0.1",
+  "description": "Shared project concept for the task, flow and queue CLIs: registry, project resolution, per-project config and data directories",
+  "type": "module",
+  "main": "./dist/cjs/index.cjs",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.tsbuildinfo",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wadeck-app/project.git",
+    "directory": "packages/project-sdk"
+  },
+  "publishConfig": {
+    "@wadeck-app:registry": "https://npm.pkg.github.com/",
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc --build tsconfig.json && node ci/build-cjs.mjs",
+    "test": "vitest run --bail=1",
+    "test:watch": "vitest",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "esbuild": "^0.27.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^7.0.0",
+    "vitest": "^4.0.14"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

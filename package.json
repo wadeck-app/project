@@ -1,0 +1,22 @@
+{
+  "name": "@wadeck-app/project",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=packages/project-sdk && npm run build --workspace=packages/project-cli",
+    "test": "npm run test --workspace=packages/project-sdk && npm run test --workspace=packages/project-cli",
+    "clean": "npm run clean --workspace=packages/project-sdk && npm run clean --workspace=packages/project-cli",
+    "preversion": "npm test"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.0",
+    "vitest": "^4.0.14"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

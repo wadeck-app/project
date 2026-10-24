@@ -1,0 +1,279 @@
+import { spawn } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { type Project, loadDeleted, loadRegistry, normalizePath, validateRegistry } from '@wadeck-app/project-sdk';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const entry = join(here, '..', 'dist', 'main.js');
+
+interface Outcome {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+interface Sandbox {
+  root: string;
+  registryDir: string;
+  env: NodeJS.ProcessEnv;
+  dir: (name: string) => string;
+  cli: (argv: string[], cwd?: string, extraEnv?: NodeJS.ProcessEnv) => Promise<Outcome>;
+}
+
+function withoutFinalNewline(text: string): string {
+  return text.replace(/\r?\n$/, '');
+}
+
+/** Real temporary home, XDG_CONFIG_HOME and work folders: the real ~/.config/project is never reachable from the spawned CLI. */
+function makeSandbox(): Sandbox {
+  const root = mkdtempSync(join(tmpdir(), 'project-cli-e2e-'));
+  const work = join(root, 'work');
+  mkdirSync(work, { recursive: true });
+  const { PROJECT_PROJECT: _inherited, ...inherited } = process.env;
+  const env: NodeJS.ProcessEnv = { ...inherited, XDG_CONFIG_HOME: join(root, 'xdg'), HOME: join(root, 'home'), USERPROFILE: join(root, 'home') };
+  return {
+    root,
+    registryDir: join(root, 'xdg', 'project'),
+    env,
+    dir: (name) => {
+      mkdirSync(join(work, name), { recursive: true });
+      return normalizePath(join(work, name));
+    },
+    cli: (argv, cwd = work, extraEnv = {}) =>
+      new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [entry, ...argv], { cwd, env: { ...env, ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
+        child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()));
+        child.on('error', reject);
+        child.on('close', (code) => resolve({ code, stdout: withoutFinalNewline(stdout), stderr: withoutFinalNewline(stderr) }));
+      }),
+  };
+}
+
+function projectNamed(sandbox: Sandbox, name: string): Project {
+  const found = loadRegistry(sandbox.registryDir).projects.find((p) => p.name === name);
+  if (found === undefined) {
+    throw new Error(`test setup: no project '${name}' in ${sandbox.registryDir}`);
+  }
+  return found;
+}
+
+beforeAll(() => {
+  // These tests drive the BUILT CLI: a missing build is a failure, never a skip.
+  if (!existsSync(entry)) {
+    throw new Error(`${entry} is missing: run 'npm run build' before 'npm test' (the end-to-end tests spawn the compiled CLI)`);
+  }
+});
+
+describe('end-to-end: a shop project with a worktree and a shared base', () => {
+  let sandbox: Sandbox;
+  let shop: string;
+  let worktree: string;
+  let elsewhere: string;
+
+  beforeAll(() => {
+    sandbox = makeSandbox();
+    shop = sandbox.dir('shop');
+    worktree = sandbox.dir('shop-wt');
+    elsewhere = sandbox.dir('elsewhere');
+  });
+  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+
+  // The steps build on each other and run in order.
+  it('1. registers the folder with an alias', async () => {
+    const result = await sandbox.cli(['add', 'shop', '--alias', 'sh']);
+    expect(result.code, result.stderr).toBe(0);
+    expect(projectNamed(sandbox, 'shop')).toMatchObject({ aliases: ['sh'], paths: [{ path: shop, main: true }] });
+  });
+
+  it('2. adds a second, non-main path', async () => {
+    const result = await sandbox.cli(['paths', 'add', 'shop', worktree]);
+    expect(result.code, result.stderr).toBe(0);
+    expect(projectNamed(sandbox, 'shop').paths).toEqual([
+      { path: shop, main: true },
+      { path: worktree, main: false },
+    ]);
+  });
+
+  it('3. resolves from the main path, from the worktree, and fails loudly from an unrelated folder', async () => {
+    const deep = sandbox.dir('shop/src/deep');
+    const fromMain = await sandbox.cli(['resolve', '--json'], deep);
+    expect(JSON.parse(fromMain.stdout)).toMatchObject({ name: 'shop', source: 'cwd', path: shop, pathVia: 'cwd' });
+    const fromWorktree = await sandbox.cli(['resolve', '--json'], worktree);
+    expect(JSON.parse(fromWorktree.stdout)).toMatchObject({ name: 'shop', path: worktree, pathVia: 'cwd' });
+    const unrelated = await sandbox.cli(['resolve'], elsewhere);
+    expect(unrelated.code).toBe(1);
+    expect(unrelated.stdout).toBe('');
+    expect(unrelated.stderr).toContain(`error: no project in scope for ${elsewhere}`);
+    expect(unrelated.stderr).toContain('Registered: shop');
+    expect(unrelated.stderr).toContain(`
+hint: pass a project reference, or register this folder with: project add "${elsewhere}"`);
+  });
+
+  it('3b. resolves from a cwd reached through a junction (symlink on POSIX) and refuses to register it as another project', async () => {
+    const link = join(dirname(shop), 'shop-link');
+    symlinkSync(shop, link, process.platform === 'win32' ? 'junction' : 'dir');
+    const viaLink = await sandbox.cli(['resolve', '--json'], join(link, 'src'));
+    expect(JSON.parse(viaLink.stdout)).toMatchObject({ name: 'shop', source: 'cwd', path: shop, pathVia: 'cwd' });
+    const duplicate = await sandbox.cli(['add', link, '--name', 'dup']);
+    expect(duplicate.code).toBe(1);
+    expect(duplicate.stderr).toContain('is already registered by project shop');
+  });
+
+  it('4. resolves --project from an unrelated folder to the main path, and never auto-selects a typo', async () => {
+    const byAlias = await sandbox.cli(['-p', 'sh', 'resolve', '--json'], elsewhere);
+    expect(JSON.parse(byAlias.stdout)).toMatchObject({ name: 'shop', source: 'flag', path: shop, pathVia: 'main' });
+    const typo = await sandbox.cli(['resolve', '-p', 'shpo'], elsewhere);
+    expect(typo.code).toBe(1);
+    expect(typo.stdout).toBe('');
+    expect(typo.stderr).toContain("no project matches 'shpo'");
+    expect(typo.stderr).toContain(`did you mean: sh (alias of shop (${projectNamed(sandbox, 'shop').id})), shop`);
+    expect(typo.stderr).not.toContain('project: shop');
+  });
+
+  it('5. shows the parent chain once shop is made a child of a virtual base', async () => {
+    expect((await sandbox.cli(['add', '--virtual', '--name', 'base'])).code).toBe(0);
+    expect((await sandbox.cli(['parent', 'set', 'shop', 'base'])).code).toBe(0);
+    const shown = await sandbox.cli(['show', 'shop']);
+    expect(shown.stdout).toContain('parent chain: base > shop');
+  });
+
+  it('9. prints valid JSON on stdout for list, show and resolve, and the resolution line on stderr', async () => {
+    const list = await sandbox.cli(['list', '--json'], elsewhere);
+    expect(JSON.parse(list.stdout)).toHaveLength(2);
+    expect(list.stderr).toBe(`registry: ${sandbox.registryDir}`);
+    const show = await sandbox.cli(['show', 'shop', '--json'], elsewhere);
+    expect(JSON.parse(show.stdout)).toMatchObject({ name: 'shop', chain: [{ name: 'base' }, { name: 'shop' }] });
+    expect(show.stderr).toBe(`project: shop (${projectNamed(sandbox, 'shop').id}) via <ref> argument, path ${shop} (main); registry: ${sandbox.registryDir}`);
+    const resolve = await sandbox.cli(['resolve', '--json'], worktree);
+    expect(JSON.parse(resolve.stdout).name).toBe('shop');
+    expect(resolve.stderr).toBe(`project: shop (${projectNamed(sandbox, 'shop').id}) via cwd, path ${worktree} (cwd); registry: ${sandbox.registryDir}`);
+  });
+
+  it('6. refuses to remove a parent, then soft-deletes both and keeps the data folders', async () => {
+    const ids = [projectNamed(sandbox, 'base').id, projectNamed(sandbox, 'shop').id];
+    const folders = await Promise.all(['base', 'shop'].map(async (name) => (await sandbox.cli(['path', name])).stdout.trim()));
+    for (const folder of folders) {
+      mkdirSync(join(folder, 'task', 'data'), { recursive: true });
+      writeFileSync(join(folder, 'task', 'data', 'keep.txt'), 'kept');
+    }
+    const refused = await sandbox.cli(['remove', 'base']);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain('--recursive');
+    const done = await sandbox.cli(['remove', 'base', '--recursive']);
+    expect(done.code, done.stderr).toBe(0);
+    expect(loadRegistry(sandbox.registryDir).projects).toEqual([]);
+    expect(loadDeleted(sandbox.registryDir).projects.map((p) => p.id).sort()).toEqual([...ids].sort());
+    for (const folder of folders) {
+      expect(readFileSync(join(folder, 'task', 'data', 'keep.txt'), 'utf8')).toBe('kept');
+    }
+  });
+});
+
+describe('end-to-end: concurrent writers', () => {
+  let sandbox: Sandbox;
+
+  beforeAll(() => {
+    sandbox = makeSandbox();
+  });
+  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+
+  it('7. keeps all 30 projects when two CLI processes add 15 each at the same time', async () => {
+    const writer = async (prefix: string): Promise<Outcome[]> => {
+      const outcomes: Outcome[] = [];
+      for (let i = 0; i < 15; i++) {
+        outcomes.push(await sandbox.cli(['add', '--virtual', '--name', `${prefix}-${i}`]));
+      }
+      return outcomes;
+    };
+    const outcomes = (await Promise.all([writer('wa'), writer('wb')])).flat();
+    for (const outcome of outcomes) {
+      expect(outcome.code, outcome.stderr).toBe(0);
+    }
+    const registry = loadRegistry(sandbox.registryDir);
+    expect(registry.projects).toHaveLength(30);
+    expect(() => validateRegistry(registry, { checkPaths: false })).not.toThrow();
+  });
+});
+
+describe('end-to-end: failures and isolation', () => {
+  let sandbox: Sandbox;
+
+  beforeAll(() => {
+    sandbox = makeSandbox();
+  });
+  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+
+  it('8. names the corrupt registry.json in an actionable error', async () => {
+    mkdirSync(sandbox.registryDir, { recursive: true });
+    const file = join(sandbox.registryDir, 'registry.json');
+    writeFileSync(file, '{oops');
+    const result = await sandbox.cli(['list']);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('error: ');
+    expect(result.stderr).toContain(file);
+    expect(result.stderr).toContain('not valid JSON');
+    expect(result.stderr).toContain('fix or restore');
+  });
+
+  it('writes under XDG_CONFIG_HOME and never under the real default directory', async () => {
+    const fresh = makeSandbox();
+    try {
+      const realRegistry = join(homedir(), '.config', 'project', 'registry.json');
+      const before = existsSync(realRegistry) ? readFileSync(realRegistry, 'utf8') : undefined;
+      const result = await fresh.cli(['add', '--virtual', '--name', 'iso']);
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.stderr).toBe(`registry: ${fresh.registryDir}`);
+      expect(existsSync(join(fresh.registryDir, 'registry.json'))).toBe(true);
+      expect(existsSync(realRegistry) ? readFileSync(realRegistry, 'utf8') : undefined).toBe(before);
+    } finally {
+      rmSync(fresh.root, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to <home>/.config/project when XDG_CONFIG_HOME is not set', async () => {
+    const fresh = makeSandbox();
+    try {
+      const home = join(fresh.root, 'home');
+      const result = await fresh.cli(['add', '--virtual', '--name', 'iso'], undefined, { XDG_CONFIG_HOME: '' });
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.stderr).toBe(`registry: ${join(home, '.config', 'project')}`);
+      expect(existsSync(join(home, '.config', 'project', 'registry.json'))).toBe(true);
+    } finally {
+      rmSync(fresh.root, { recursive: true, force: true });
+    }
+  });
+
+  it('announces on stderr that it waits for a held registry lock, then completes once it is released', async () => {
+    const fresh = makeSandbox();
+    try {
+      mkdirSync(fresh.registryDir, { recursive: true });
+      const lock = join(fresh.registryDir, 'registry.lock');
+      writeFileSync(lock, JSON.stringify({ pid: 4242, token: 'held-by-the-test', host: 'test', createdAt: new Date().toISOString() }));
+      const pending = fresh.cli(['add', '--virtual', '--name', 'waiter']);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      rmSync(lock);
+      const result = await pending;
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.stderr).toContain('waiting for the registry lock held by pid 4242');
+      expect(loadRegistry(fresh.registryDir).projects.map((p) => p.name)).toEqual(['waiter']);
+    } finally {
+      rmSync(fresh.root, { recursive: true, force: true });
+    }
+  });
+
+  it('prints the version and fails with exit 2 on a usage error, as a real process', async () => {
+    const version = await sandbox.cli(['--version']);
+    expect(version).toMatchObject({ code: 0, stderr: '' });
+    expect(version.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+    const usage = await sandbox.cli(['nope']);
+    expect(usage.code).toBe(2);
+    expect(usage.stderr).toContain("Run 'project --help' for usage.");
+  });
+});

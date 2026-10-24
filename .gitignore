@@ -1,0 +1,11 @@
+node_modules/
+.idea/
+dist/
+dist-bundle/
+dist-types/
+*.tsbuildinfo
+*.log
+# Protected directory for secrets (.env.local, credentials, tokens)
+_secrets_/
+# Git Bash (MSYS2) crash dumps
+*.stackdump

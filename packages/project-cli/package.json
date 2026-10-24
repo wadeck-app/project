@@ -1,0 +1,28 @@
+{
+  "name": "@wadeck-app/project-cli",
+  "version": "0.0.1",
+  "description": "The project command: register, inspect and resolve the projects shared by the task, flow and queue CLIs",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "project": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc --build tsconfig.json",
+    "test": "vitest run --bail=1",
+    "test:watch": "vitest",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@wadeck-app/project-sdk": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^7.0.0",
+    "vitest": "^4.0.14"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,87 @@
+name: CI / Publish
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+    workflow_dispatch:
+        inputs:
+            version:
+                description: 'Stable version (e.g. 1.2.0)'
+                required: false
+                default: ''
+            breaking:
+                description: 'Breaking change? (true/false)'
+                required: false
+                default: 'false'
+
+permissions:
+    contents: read
+    packages: write
+
+jobs:
+    # The SDK and the CLI run on every developer machine: build and test both on all three OS
+    build-and-test:
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@v5
+
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: '24'
+                  registry-url: 'https://npm.pkg.github.com'
+                  scope: '@wadeck-app'
+
+            - name: Install dependencies
+              run: npm ci
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build TypeScript
+              run: npm run build
+
+            - name: Run tests
+              run: npm test
+
+    publish:
+        needs: [build-and-test]
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: '24'
+                  registry-url: 'https://npm.pkg.github.com'
+                  scope: '@wadeck-app'
+
+            - name: Install dependencies
+              run: npm ci
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build TypeScript
+              run: npm run build
+
+            - name: Compute version
+              id: version
+              uses: wadeck-app/ci-templates/.github/actions/compute-version@main
+              with:
+                  version-input: ${{ github.event.inputs.version || '' }}
+                  breaking-input: ${{ github.event.inputs.breaking || 'false' }}
+
+            # project-cli is NOT published yet: its launcher, platform packages and auto-update are still to do
+            - name: Publish project-sdk
+              working-directory: packages/project-sdk
+              run: |
+                  npm pkg set version="${{ steps.version.outputs.version }}"
+                  npm publish --tag ${{ steps.version.outputs.dist_tag }}
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

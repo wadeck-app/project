@@ -1,0 +1,128 @@
+# Spec: Projects (shared scope for task / flow / queue)
+
+**Created:** 2026-10-23
+**Version:** v0.1
+**Status:** In Progress -- v0.23 -- 22/32 questions resolved (+4 partial, 1 deferred)
+**Iteration:** 1
+
+## Summary
+
+Introduce a "project" concept: a base folder (usually a git repo, not required) that scopes the task, flow and queue CLIs, with global visibility so one project can act on another (e.g. add a task to project B from project A). Possibly nested scopes. Current-state facts: `01_current-state.md`.
+
+## Decision Log
+
+| # | Decision | Status | Date | Rationale |
+|---|---|---|---|---|
+| 1 | Structure C: written contract + zero-dep SDK `project-sdk` + thin `project-cli` + uniform `--project/-p` flag in task/flow/queue; file registry as authority. task/flow/queue depend on `project-sdk` only. D (central service) and A-alone rejected. | Decided | 2026-10-24 | Removes drift between the 3 resolvers; D would force a silent fallback when the service is down (P-1) |
+| 2 | Identity: immutable generated id (assigned at `project add`) + unique human name (default: folder name); path is a mutable attribute. Where the id is stored: Q3. Ref forms and ambiguity errors: Q5. | Decided | 2026-10-24 | Folder move/rename must not orphan records; path-only breaks temp-dir workers and containers (R-6, R-7) |
+| 3 | Resolution: registry-only, no marker file in project folders. The SDK matches the cwd against registered paths (deepest registered ancestor wins) with an optimized discovery algorithm. A folder moved outside the tool is not found and fails loudly with an actionable error; `project move` keeps the id. Details: `resolution.md`. | Decided | 2026-10-24 | User choice: simplest, fully centralized; nothing written in project folders. Cost: manual moves orphan the path until `project move` |
+| 4 | Registry: in the config dir (`~/.config/project/`), overridable (env var / `--config` for the CLI, a registry-config option for SDK-using CLIs) so tests never touch production. Structure: index `registry.json` + one sub-folder per project with its per-tool config (task, queue, flow...), readable by the other CLIs with inheritance. A project has 0-n paths (worktrees/variants, optional tag such as `main`) and an optional git repo. Amends #3 for multi-path. Details: `registry.md`. | Decided (partial: sub-points in Q14-Q17) | 2026-10-24 | User choice: centralized, testable in isolation, models worktrees. Option A (single file) of the proposal was replaced by index + per-project folders |
+| 6 | Inheritance link: each project has an optional explicit single `parent` (project id) in the registry; chain = global > parent > ... > project. Folder nesting has no config meaning. Virtual projects can be parents. Cycles are refused. Multiple parents not supported. Details: `inheritance.md`. | Decided | 2026-10-24 | Only option that supports virtual shared-config projects; hooks/subscribers are never inherited by folder accident (T-02) |
+| 7 | Merge rule: strategy per config section, declared by the owning CLI, from a small fixed set implemented in `project-sdk` (replace, deep-merge, append; default deep-merge, child wins). The declaration must be explicit and enforced, and visible in the configuration itself. Mechanism (key prefixes, schema metadata, ...): open, Q19. | Decided (principle); mechanism open | 2026-10-24 | Keeps each tool's current behavior (queue appends, flow replaces, task field-wise) with one SDK implementation; user requires it to be declared and enforced, not implicit |
+| 8 | Mechanism for #7: each CLI declares scope (global-only / local / inheritable) and merge strategy per section in a schema exported to `project-sdk`, which validates config files against it (misplaced key = error) and `project show` displays the rules. Config files keep plain key names. Optional `global.` / `local.` key prefixes may be added on top later; not required by this decision. The contract must be cleanly defined in `project-sdk`; cleanup can come later. Details: `inheritance.md`. | Decided | 2026-10-24 | User choice: the schema contract in the SDK is what matters; no format change in task/flow/queue now |
+| 9 | Data is centralized with config: each tool's data lives in the project's folder under the config dir (e.g. `<configDir>/<project>/task/...`), reached through an SDK data-directory function. Tasks and other data are NOT stored in project folders. Flow/queue records are keyed by project id instead of path. Details: `registry.md`. | Decided | 2026-10-24 | A project can have several paths (worktrees): in-folder data would diverge per variant ("would simply be wrong"); also enables virtual projects with data and path-independent workers/containers |
+| 10 | Cross-project permission: none. Any registered project can target any other. When the origin project is available, it is recorded with the action (task history, events) and passed to hooks/subscribers as context; the resolved target (name, id, path used) is stated in command output. No origin when the call comes from outside any project. A "friend" system may come later: out of scope now. | Decided | 2026-10-24 | P-2 (trusted machines): default-deny adds friction for agents and scripts; visibility covers mistakes after the fact |
+| 11 | Reference syntax for `--project` / `-p`: an id (full or unique prefix), a name, or an alias. Paths are NOT accepted. A project has 0-n aliases (e.g. `task-cli` -> `task`, `tsk`) to type fast. Names/aliases match case-insensitively. An ambiguous reference is an error listing the candidates, never a guess. On no match, the error shows the closest names/aliases (Levenshtein distance) as suggestions only; nothing is ever auto-selected. Derived rule to confirm: a name or alias cannot collide with another project's name, alias or id (refused at registration, error names the owner). Details: `registry.md`. | Decided | 2026-10-24 | Speed for humans and agents; unambiguous resolution (T-01); better UX on typos without risking a wrong target |
+| 12 | Registry location override: (a) a file `.projects-temp-override.json` in the root of the cwd ONLY (no walk-up) forces the registry location; the product injects it into the temporary folder it creates for a worker (R-6). (b) Every command logs, at start, how the configuration was resolved (registry location and its source, project and its source). Proposed, to confirm: env var `PROJECT_CONFIG` (directory) and `--config <dir>` / `--project-registry-config <dir>` as in the Option A discussion, precedence flag > env > override file > default (`$XDG_CONFIG_HOME/project` or `~/.config/project`); an override that points to a missing/invalid registry is an error, never a fallback. File content format: to define. Details: `registry.md`. | Decided (a, b); proposed (names, precedence) | 2026-10-24 | User: no env/propagation burden for workers (inject at creation), no walk-up (no second discovery rule), always visible resolution |
+| 13 | Registry write safety: writers serialize through a lock file in the registry directory containing the holder's pid; a lock whose last touch (mtime) is older than 30 s is stale and can be taken over. Atomic temp-file + rename (Decision #4) is kept; it lets readers skip the lock. Requirements derived by the assistant, to confirm: unique token in the lock (pid + random) re-checked just before the rename; atomic takeover of a stale lock; periodic touch for long operations; waiters print "waiting for lock held by pid N (age Ns)" and fail with an actionable error after the timeout. Details: `registry.md`. | Decided (lock + pid + 30 s stale rule; derived requirements confirmed by the user) | 2026-10-24 | Prevents lost updates; mtime-based staleness works when pids are not comparable |
+| 14 | No implicit registration. A command that needs a project (anything but e.g. `--version`, `--help`) in an unregistered folder fails with an actionable error (cwd, registered projects, the exact `project add` command). `project add` is the only registration entry point. No silent failure. | Decided | 2026-10-24 | P-1; one place for name/alias/parent/uniqueness rules; silent registration could create wrong entries (T-01) |
+| 15 | Each project's folder in the config dir is named by its id (e.g. `<configDir>/projects/<id>/`). Never derived from a name or alias. `project path <ref>` prints it. | Decided | 2026-10-24 | Stable under rename (Decision #2), filesystem-safe, no name-derived path (traversal); readability not needed (folders are not meant to be browsed) |
+| 16 | The registry-location override is DEFERRED: the cwd-root override file (#12a), the env var / `--config` / `--project-registry-config` flags and their precedence (#4, #12 proposals), propagation to child processes and the daemon-vs-registry mismatch rule (Q21) are not part of the first version. Version 1 uses the default location only. The "always log how the configuration resolved" rule (#12b) stays. History is kept: #4 and #12 are amended, not removed. Discussions documented in `10_findings_daemon-registry-mismatch.md`. | Decided (deferral) | 2026-10-24 | User: get a working feature first, stabilize later if needed. Known cost: T-07 stays open, tests that use the SDK touch the default registry unless the environment is redirected by other means |
+| 17 | Migration: no migration code. Existing data (`.task` folders, `.flow`/`.queue` layouts, `projects.json`, a handful of files/folders) is moved by hand into the config repositories once the CLIs are ready, either by project-owner or by the CLI owners themselves (to negotiate with them). | Decided | 2026-10-24 | User: only 4-5 files/folders to move, code would cost more than it saves |
+| 18 | The SDK package is named `project-sdk` (formerly `project-kit` in this spec and in files 08, 09, HANDOFF, which keep the old name as history). It is versioned like app-core-sdk: CalVer published by CI (source version stays a placeholder; verified installed example `2026.10.18-035-2f12ad8e`, source `0.0.1`), and consumers depend on `"latest"` (verified: task-cli and app-module-task declare `@wadeck-app/app-core-sdk: "latest"`). Exact publish workflow to copy from app-core. Risk accepted: a breaking SDK change reaches consumers at their next install. | Decided (user confirmed the reading) | 2026-10-24 | User: same model as app-core-sdk |
+| 19 | `project remove` is a soft delete: the project leaves `registry.json` and its entry is appended to `deleted_projects.json`; the project's folder `projects/<id>/` and its data are not deleted. Details (project with children, name reuse, restore): Q32. | Decided | 2026-10-24 | User: soft delete; keeps task's guarantee that remove never deletes data |
+| 20 | Project management lives only in the `project` CLI (add, list, move, remove, alias, ...). task/flow/queue expose no registration or management commands: `task init` and `task projects add|remove|move|prune|list` are removed or merged into `project`; task-specific `summary` and `list --all-projects` stay. At the end all CLIs use the project concept the same way. Remove vs merge per command: task-owner and project-owner. | Decided | 2026-10-24 | User: consistency of all CLIs |
+| 21 | Default project for a CLI: one env var per CLI, holding a project reference (id, name or alias). Names proposed: `TASK_PROJECT`, `FLOW_PROJECT`, `QUEUE_PROJECT` (and one for `project` itself, to name). Precedence proposed: `--project` flag, then the env var, then cwd resolution. `TASK_PROJECT_DIR` / `PROJECT_DIR` (paths) are removed. | Decided (per-CLI env var); names and precedence proposed | 2026-10-24 | User: "per CLI" |
+| 22 | Optional git repo: one optional field on the project holding the repo, stored as given, no validation, no behavior in version 1. | Decided | 2026-10-24 | User: a git repo field, nothing else |
+| 23 | Default registry location: `$XDG_CONFIG_HOME/project` if set, else `~/.config/project`. Name/alias/id collisions across projects are never allowed (confirmation of #11). | Decided | 2026-10-24 | User confirmation |
+| 24 | Amends #19: removing a project that has children is an error that suggests `--recursive`. Reading of `--recursive`: the project and all its descendants are soft-deleted together (to correct if wrong). | Decided | 2026-10-24 | User: a parent cannot be removed silently; avoids dangling parents (Decision #6) |
+| 25 | Cwd rule with several paths: when the command runs inside one of the project's paths, that path is the cwd (events, runs, `ctx.project.path`); `main` is used only when the command runs outside the project (e.g. `--project B` from elsewhere). Already implied by the `main` rule (Decision #5). | Decided | 2026-10-24 | User: this is what `main` is for |
+| 26 | Validation: the full check (unique names/aliases/ids, one `main`, parents exist and no cycle, registered paths exist) runs only on write, not on every read. Reads keep the cheap checks that already fail loudly: unreadable JSON / unknown schema version (derived, to confirm) and ambiguous reference at lookup (Decision #11). An on-demand `project` validation command is possible later, not decided. | Decided | 2026-10-24 | User: checking that several paths exist is slow; only on write |
+| 27 | SDK API: implemented and tested in `packages/project-sdk` (README lists the public functions and error classes), exercised end to end by `packages/project-cli` (mini CLI: add, list, show, path, resolve, rename, alias, parent, git, paths, remove). Defaults chosen during implementation: id = 8 hex chars; names/aliases `^[a-z][a-z0-9._-]*$` max 64, never id-shaped; stored paths use forward slashes; blank env value = unset; `project remove` requires an explicit ref. Not in the SDK: YAML/JSON parsing of tool config (each CLI loads its own files and passes parsed layers to `validateLayer` / `mergeLayers`), origin recording (Q26), the override (Decision #16). Not yet published: no CI workflow, no launcher/auto-update for `project-cli`. | Implemented (verified 2026-10-24: build green, SDK 323 tests + 3 skipped POSIX-only, CLI 101) | 2026-10-24 | Q23 |
+| 5 | Path rules: (1) a path belongs to exactly one project, registering a path held by another project is refused with an error naming the owner; (2) a project with at least one path has exactly one `main` path; (3) a project may have 0 paths ("virtual" project), used to hold config shared between other projects. Commands needing a cwd on a virtual project fail loudly. Details: `registry.md`. | Decided | 2026-10-24 | Unambiguous resolution (closes T-05); always-defined default path; virtual projects carry shared config |
+
+## Open Questions
+
+| # | Question | Priority | Status |
+|---|---|---|---|
+| 1 | Overall structure of the project concept: convention, SDK, `project` CLI, wrapper, daemon (see `06_structure-options.md`) | High | Resolved (Decision #1) |
+| 2 | What identifies a project (absolute path, generated id, name)? | High | Resolved (Decision #2) |
+| 3 | What marks a project root and how is it resolved (walk-up, marker file)? | High | Resolved (Decision #3) |
+| 4 | Nested scopes: do they exist, and how does config inherit? | High | Resolved (Decision #6); merge rule in #13 |
+| 5 | Cross-project targeting syntax (flag, env, ref in ids) | Medium | Partially resolved (flag and reference forms: Decision #11); env var and cross-project ids in #20 |
+| 6 | Do daemon-global stores (queue WAL, flow history) get a project key/filter? | Medium | Partially resolved (records keyed by project id: Decision #9); user-facing filters (`queue history --project`) open |
+| 7 | Migration of existing `projects.json`, per-CLI markers and in-folder data/config (`.task`, `.flow`, `.queue`): who migrates, legacy config fallback or ignored, duplicate basenames (two `alpha`), stray config keys now rejected (#8) | High | Resolved (Decision #17: manual move, no migration code); who moves what is negotiated with the owners |
+| 8 | Permission model for acting on another project (hooks, subscribers) | High | Resolved (Decision #10) |
+| 9 | Does a standalone `project` CLI binary exist, or are commands hosted in existing CLIs? | Medium | Resolved (Decision #1: thin `project-cli`) |
+| 10 | Registry file location and format (single shared file vs per-CLI; id/metadata) | Medium | Resolved (Decision #4); open details in #14-#16 |
+| 11 | Config layout: central config store vs per-tool dirs vs both; source of truth (R-5, R-6, R-7) | High | Resolved (Decisions #4, #9: central per-project sub-folders for config and data; legacy in-folder files moved by hand, Decision #17) |
+| 12 | Config vs data: centralize config only, or data too (temp-dir workers, containers) | High | Resolved (Decision #9) |
+| 13 | Inheritance: explicit parent in registry vs folder nesting; per-section merge rule | High | Resolved (parent link: Decision #6; merge principle: Decision #7); mechanism in #19 |
+| 14 | Path semantics: can a path belong to two projects, meaning of the `main` tag (at most one? required?), project with 0 paths, which path supplies the cwd for commands | High | Resolved (Decision #5) |
+| 15 | Optional git repo: what is stored (remote URL, local path, both) and what it is used for | Medium | Resolved (Decision #22: one optional free field) |
+| 16 | Registry location details: env var names, `--config` precedence, SDK option name, Windows location; locking and validated reads on the index (atomic write is decided in #4) | High | Resolved for version 1 (locking: Decision #13; logging: #12b; validation: Decision #26); override names/precedence/file deferred (Decision #16) |
+| 17 | Implicit registration: does a command run in an unregistered folder register it, or fail (task-owner question) | Medium | Resolved (Decision #14) |
+| 31 | Queue subscriber lookup: with subscribers stored per project in the registry, does the event `cwd` select the project by registry path match (no walk-up for `.queue/subscribers.yml`)? | High | Proposed with queue-owner, not yet confirmed by the user: lookup by `findProjectForPath`; a cwd outside every registered project fires global subscribers AND logs a loud actionable warning (daemon log and `queue push` output, naming the cwd and the `project add` command) instead of failing the push; temporary logged walk-up fallback inside queue until the `subscribers.yml` files are moved by hand (Decision #17), then removed |
+| 23 | SDK public API shape: registry lookup, data-dir function (signature, does it create the dir), config read with inheritance, origin | High | Resolved (Decision #27; origin excluded, see Q26) |
+| 24 | Fate of `task init` and `task projects *` (remove, deprecate, wrappers over `project add`) | Medium | Resolved (Decision #20) |
+| 25 | `project remove`: does it delete the project's config/data folder (task guarantees today that remove never deletes data) | High | Resolved (Decision #19: soft delete) |
+| 32 | Soft delete details: reuse of a deleted project's name/aliases, restore command (removing a project with children: Decision #24) | Medium | Partially resolved; name reuse and restore open |
+| 26 | Origin recording format: fields, where (task history, event payloads, hook env), virtual project or no project | Medium | Open |
+| 27 | Which identifier appears in app URLs/API (id length, name/alias change on rename); how the app-core module finds the registry | Medium | Open |
+| 28 | Several paths: cwd for events and `ctx.project.path` from a non-main worktree; virtual projects (no cwd) and events | High | Resolved (Decision #25; virtual projects: Decision #5) |
+| 29 | Inheritance chain: where a write (`task type add`) goes, and cross-level validation (e.g. at most one default status) | Medium | Open |
+| 30 | Do lock + atomic write cover tool data (task-index.json read-modify-write), or only the registry | Medium | Open |
+| 22 | Name of each project's folder in the config dir (id, name slug, or both); must stay valid when a name/alias is renamed | High | Resolved (Decision #15) |
+| 18 | `project-sdk` versioning and pinning (queue-sdk model vs singleton-daemon-kit model) | Medium | Resolved (Decision #18: CalVer + "latest", like app-core-sdk) |
+| 21 | Daemons (flow, queue) are shared by all clients: what happens when a client uses a different registry location than the one the daemon started with (test vs production) | High | Deferred (Decision #16); owner findings in file 10 (queue-owner replied; flow-owner request withdrawn) |
+| 20 | Env var to set a default project (e.g. for agents/workers) and syntax for referring to another project's task/run/event ids | Medium | Partially resolved (env var per CLI: Decision #21); syntax for another project's ids open |
+| 19 | How is a section's scope and merge strategy declared and enforced in the configuration (key prefixes such as global./local., schema metadata, key operators) | High | Resolved (Decision #8) |
+
+## Modules / Sub-files
+
+| File | Contents |
+|---|---|
+| `01_current-state.md` | Verified map of how task/flow/queue resolve state today |
+| `02_findings_task.md`, `03_findings_flow.md`, `04_findings_queue.md` | Per-repo spec/plan/doc mining (agent reports) |
+| `06_structure-options.md` | Structures A-D for the concept |
+| `07_requirements-scenarios.md` | User requirements R-1..R-7 and scenarios S1-S12 |
+| `08_findings_update-and-release.md` | How task/flow/queue auto-update, publish and pin (verified); pitfalls to avoid |
+| `inheritance.md` | Parent link and effective config (Decision #6) |
+| `registry.md` | Registry location, structure, per-project config folders (Decision #4) |
+| `resolution.md` | Identity and folder-to-project resolution (Decisions #2, #3) |
+| `09_findings_task-impact.md` | Impact of the decisions on task, reported by task-owner |
+| `10_findings_daemon-registry-mismatch.md` | Owner findings on daemon vs registry location (Q21) |
+| `11_findings_repo-layout.md` | Layout, CI, release and pitfalls of the existing CLIs (R-9, R-10) |
+| `HANDOFF.md` | State, next steps and rules for the session taking over this spec |
+| `05_constraints-and-triage.md` | Verified constraints C-1..C-12, inconsistencies I-1..I-9, question triage |
+| `guiding-principles.md` | Core principles driving all decisions |
+| `out-of-scope.md` | Explicitly excluded items |
+| `threat-model.md` | Security threats and mitigations |
+
+## Changelog
+
+| Version | Date | Summary |
+|---|---|---|
+| v0.1 | 2026-10-23 | Initial spec created |
+| v0.2 | 2026-10-24 | Decision #1: structure C |
+| v0.3 | 2026-10-24 | Decision #2: generated id + unique name |
+| v0.4 | 2026-10-24 | Decision #3: registry-only resolution, no marker |
+| v0.23 | 2026-10-24 | Decision #27: SDK and mini CLI implemented and verified |
+| v0.22 | 2026-10-24 | Decisions #24-#26: remove parent needs --recursive, cwd = where you are, validation on write only; #13 and #18 confirmed |
+| v0.21 | 2026-10-24 | Decisions #18-#23: project-sdk name and CalVer/latest, soft delete, CLI consistency, per-CLI default-project env, git repo field, default location; question 32 added |
+| v0.20 | 2026-10-24 | Decision #17: manual migration, no migration code |
+| v0.19 | 2026-10-24 | Decision #16: registry override and daemon mismatch (Q21) deferred |
+| v0.18 | 2026-10-24 | queue-owner findings on Q21 (file 10); question 31 added |
+| v0.17 | 2026-10-24 | task-owner impact findings (file 09); questions 23-30 added, Q7 widened |
+| v0.16 | 2026-10-24 | Decision #15: project folder named by id |
+| v0.15 | 2026-10-24 | Decision #14: no implicit registration; question 22 added |
+| v0.14 | 2026-10-24 | Decision #13: lock file with pid and 30 s staleness |
+| v0.13 | 2026-10-24 | Decision #12: cwd-root override file, always-logged resolution |
+| v0.12 | 2026-10-24 | Decision #11: refs by id/name/alias, Levenshtein suggestions; question 20 added |
+| v0.11 | 2026-10-24 | Decision #10: open cross-project targeting, origin recorded when available |
+| v0.10 | 2026-10-24 | Decision #9: data centralized with config |
+| v0.9 | 2026-10-24 | Decision #8: schema-declared scope and merge strategy in project-sdk; prefixes optional later |
+| v0.8 | 2026-10-24 | Decision #7: per-section merge strategy declared by the CLI; mechanism question 19 added |
+| v0.7 | 2026-10-24 | Decision #6: explicit single parent for inheritance |
+| v0.6 | 2026-10-24 | Decision #5: path rules (unique owner, exactly one main, virtual projects) |
+| v0.5 | 2026-10-24 | Decision #4: registry in config dir, index + per-project folders, 0-n paths, optional git repo; questions 14-18 added |
