@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +29,8 @@ function withoutFinalNewline(text: string): string {
 
 /** Real temporary home, XDG_CONFIG_HOME and work folders: the real ~/.config/project is never reachable from the spawned CLI. */
 function makeSandbox(): Sandbox {
-  const root = mkdtempSync(join(tmpdir(), 'project-cli-e2e-'));
+  // Real path on purpose: on macOS the temporary directory is a symlink (/var -> /private/var) and the spawned CLI sees process.cwd() as the real path.
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'project-cli-e2e-')));
   const work = join(root, 'work');
   mkdirSync(work, { recursive: true });
   const { PROJECT_PROJECT: _inherited, ...inherited } = process.env;

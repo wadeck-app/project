@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { normalizePath } from '@wadeck-app/project-sdk';
@@ -23,7 +23,8 @@ export interface Harness {
 
 /** Test-only (excluded from the build): a real temporary registry and work folders; call cleanup() in afterEach. */
 export function makeHarness(): Harness {
-  const root = mkdtempSync(join(tmpdir(), 'project-cli-ws-'));
+  // Real path on purpose: on macOS the temporary directory is a symlink (/var -> /private/var).
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'project-cli-ws-')));
   const workRoot = join(root, 'work');
   mkdirSync(workRoot, { recursive: true });
   const env: NodeJS.ProcessEnv = { XDG_CONFIG_HOME: join(root, 'xdg') };
