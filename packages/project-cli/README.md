@@ -1,6 +1,21 @@
 # @wadeck-app/project-cli
 
-The `project` command: register, inspect and resolve the projects shared by the task, flow and queue CLIs. Thin layer over `@wadeck-app/project-sdk` (registry location, rules and errors are defined there). Private; no launcher or auto-update yet.
+The `project` command: register, inspect and resolve the projects shared by the task, flow and queue CLIs. Thin layer over `@wadeck-app/project-sdk` (registry location, rules and errors are defined there).
+
+## Install
+
+Published on GitHub Packages. Once, in your user `.npmrc` (the token needs `read:packages`):
+
+```
+@wadeck-app:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=<token>
+```
+
+Then `npm i -g @wadeck-app/project-cli` gives the `project` command (node >= 22).
+
+**There is no auto-update yet** (and no launcher): upgrade by hand with `npm i -g @wadeck-app/project-cli@latest`.
+
+## Usage
 
 `project --help` lists the commands. `--project` / `-p <ref>` is accepted anywhere in argv; `--json` prints machine output on stdout. Default target of a command without `<ref>`: `--project`, then `PROJECT_PROJECT`, then the project containing the cwd.
 

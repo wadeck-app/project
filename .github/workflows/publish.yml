@@ -77,11 +77,21 @@ jobs:
                   version-input: ${{ github.event.inputs.version || '' }}
                   breaking-input: ${{ github.event.inputs.breaking || 'false' }}
 
-            # project-cli is NOT published yet: its launcher, platform packages and auto-update are still to do
             - name: Publish project-sdk
               working-directory: packages/project-sdk
               run: |
                   npm pkg set version="${{ steps.version.outputs.version }}"
+                  npm publish --tag ${{ steps.version.outputs.dist_tag }}
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            # project-cli is published as a plain npm package pinned to the SDK version published just above.
+            # Still to do: the launcher, the platform packages and the auto-update (installs are updated by hand until then).
+            - name: Publish project-cli
+              working-directory: packages/project-cli
+              run: |
+                  npm pkg set version="${{ steps.version.outputs.version }}"
+                  npm pkg set dependencies.@wadeck-app/project-sdk="${{ steps.version.outputs.version }}"
                   npm publish --tag ${{ steps.version.outputs.dist_tag }}
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,10 +2,24 @@
   "name": "@wadeck-app/project-cli",
   "version": "0.0.1",
   "description": "The project command: register, inspect and resolve the projects shared by the task, flow and queue CLIs",
-  "private": true,
   "type": "module",
   "bin": {
     "project": "./dist/main.js"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.tsbuildinfo",
+    "!dist/**/*.d.ts",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wadeck-app/project.git",
+    "directory": "packages/project-cli"
+  },
+  "publishConfig": {
+    "@wadeck-app:registry": "https://npm.pkg.github.com/",
+    "access": "public"
   },
   "scripts": {
     "build": "tsc --build tsconfig.json",
