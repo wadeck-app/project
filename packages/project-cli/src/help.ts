@@ -8,7 +8,8 @@ const REGISTRY_NOTE = 'The registry lives in $XDG_CONFIG_HOME/project, else ~/.c
 /** `[<ref>] <new-name>`: the positional arguments of a command. */
 export function argsSyntax(command: Command): string {
   const ref = command.target === 'ref' ? ['[<ref>]'] : command.target === 'explicit' ? ['<ref>'] : [];
-  return [...ref, ...command.args.map((a) => `<${a}>`), ...(command.optionalArgs ?? []).map((a) => `[${a}]`)].join(' ');
+  const required = command.args.map((a, i) => (command.variadic === true && i === command.args.length - 1 ? `<${a}>...` : `<${a}>`));
+  return [...ref, ...required, ...(command.optionalArgs ?? []).map((a) => `[${a}]`)].join(' ');
 }
 
 /** `project paths add [<ref>] <path>` */

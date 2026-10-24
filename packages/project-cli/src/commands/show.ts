@@ -1,6 +1,6 @@
 import { describeProject, getChain } from '@wadeck-app/project-sdk';
 import type { TargetCommand } from '../command.js';
-import { pathLines, projectFolder } from '../format.js';
+import { forJson, labelList, pathLines, projectFolder } from '../format.js';
 
 export const showCommand: TargetCommand = {
   name: 'show',
@@ -13,10 +13,11 @@ export const showCommand: TargetCommand = {
     const chain = getChain(registry, project);
     const folder = projectFolder(context.registryDir, project);
     return {
-      json: { ...project, chain: chain.map(({ id, name }) => ({ id, name })), folder },
+      json: { ...forJson(project), chain: chain.map(({ id, name }) => ({ id, name })), folder },
       lines: [
         describeProject(project),
         `  aliases: ${project.aliases.join(', ') || 'none'}`,
+        `  labels: ${labelList(project)}`,
         `  parent chain: ${chain.length > 1 ? chain.map((p) => p.name).join(' > ') : 'none'}`,
         '  paths:',
         ...pathLines(project, '    '),

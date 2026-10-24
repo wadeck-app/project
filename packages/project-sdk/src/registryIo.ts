@@ -45,6 +45,9 @@ function projectProblem(value: unknown, withDeletedAt: boolean): string | undefi
   if (!Array.isArray(paths) || !paths.every((p) => isRecord(p) && typeof p['path'] === 'string' && typeof p['main'] === 'boolean')) {
     return "has no 'paths' array of { path: string, main: boolean }";
   }
+  if (value['labels'] !== undefined && !isStringArray(value['labels'])) {
+    return "has a 'labels' that is not an array of strings";
+  }
   for (const key of ['parent', 'git'] as const) {
     if (value[key] !== undefined && typeof value[key] !== 'string') {
       return `has a non-string '${key}'`;

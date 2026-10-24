@@ -1,5 +1,6 @@
 import { renameProject } from '@wadeck-app/project-sdk';
 import type { TargetCommand } from '../command.js';
+import { forJson } from '../format.js';
 
 export const renameCommand: TargetCommand = {
   name: 'rename',
@@ -9,6 +10,6 @@ export const renameCommand: TargetCommand = {
   options: {},
   run: async (context, { scope }, [newName]) => {
     const project = await renameProject(context.registryDir, scope.project.id, newName!, { lock: context.lock });
-    return { json: project, lines: [`renamed ${scope.project.name} -> ${project.name} (${project.id})`], mutation: `rename ${scope.project.name} (${project.id}) -> ${project.name}` };
+    return { json: forJson(project), lines: [`renamed ${scope.project.name} -> ${project.name} (${project.id})`], mutation: `rename ${scope.project.name} (${project.id}) -> ${project.name}` };
   },
 };

@@ -297,6 +297,8 @@ describe('end-to-end: the update notice', () => {
     expect(JSON.parse(first.stdout)).toEqual([]);
     const second = await sandbox.cli(['list', '--json']);
     expect(second.stderr).not.toContain('Updated to');
+    // The state stays, for cli rollback, which needs its previousVersion.
+    expect(existsSync(stateFile())).toBe(true);
   });
 
   it('tells that a background update failed, with its reason and what to run', async () => {
@@ -363,3 +365,65 @@ async function waitFor(condition: () => boolean): Promise<void> {
   }
   throw new Error('timed out waiting for the log to show the expected line');
 }
+
+describe('end-to-end: labels', () => {
+  let sandbox: Sandbox;
+
+  beforeAll(() => {
+    sandbox = makeSandbox();
+  });
+  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+
+  const names = async (...selectors: string[]): Promise<string[]> => {
+    const result = await sandbox.cli(['list', '--json', ...selectors.flatMap((s) => ['--label', s])]);
+    expect(result.code, result.stderr).toBe(0);
+    return (JSON.parse(result.stdout) as { name: string }[]).map((p) => p.name);
+  };
+
+  // The steps build on each other and run in order.
+  it('registers projects with labels, and filters the list by key, key::value, bare value and AND', async () => {
+    const shop = await sandbox.cli(['add', sandbox.dir('shop'), '--label', 'state::production', '--label', 'sandbox', '--json']);
+    expect(JSON.parse(shop.stdout).labels).toEqual(['state::production', 'sandbox']);
+    await sandbox.cli(['add', sandbox.dir('blog'), '--label', 'state::temp']);
+    await sandbox.cli(['add', sandbox.dir('notes')]);
+    expect(await names('state')).toEqual(['shop', 'blog']);
+    expect(await names('state::production')).toEqual(['shop']);
+    expect(await names('sandbox')).toEqual(['shop']);
+    expect(await names('state', 'sandbox')).toEqual(['shop']);
+    expect(await names('state::temp', 'sandbox')).toEqual([]);
+  });
+
+  it('adds and removes labels, and shows them', async () => {
+    expect((await sandbox.cli(['label', 'add', 'blog', 'owner::alice', 'owner::bob'])).code).toBe(0);
+    expect(await names('owner')).toEqual(['blog']);
+    expect((await sandbox.cli(['show', 'blog'])).stdout).toContain('labels: state::temp, owner::alice, owner::bob');
+    expect((await sandbox.cli(['label', 'remove', 'blog', 'owner::alice'])).code).toBe(0);
+    expect(JSON.parse((await sandbox.cli(['show', 'blog', '--json'])).stdout).labels).toEqual(['state::temp', 'owner::bob']);
+  });
+
+  it('refuses an invalid label and the removal of an absent one, loudly', async () => {
+    const invalid = await sandbox.cli(['label', 'add', 'blog', 'a::b::c']);
+    expect(invalid.code).toBe(1);
+    expect(invalid.stderr).toContain("label 'a::b::c' is invalid");
+    const absent = await sandbox.cli(['label', 'remove', 'blog', 'sandbxo']);
+    expect(absent.code).toBe(1);
+    expect(absent.stderr).toContain("has no label 'sandbxo'");
+  });
+
+  it('keeps the labels of a removed project in deleted_projects.json', async () => {
+    expect((await sandbox.cli(['remove', 'shop'])).code).toBe(0);
+    const deleted = JSON.parse(readFileSync(join(sandbox.registryDir, 'deleted_projects.json'), 'utf8')) as { projects: { name: string; labels: string[] }[] };
+    expect(deleted.projects.find((p) => p.name === 'shop')?.labels).toEqual(['state::production', 'sandbox']);
+  });
+
+  it('still loads and lists a registry.json written before labels existed', async () => {
+    const file = join(sandbox.registryDir, 'registry.json');
+    const registry = JSON.parse(readFileSync(file, 'utf8')) as { projects: Record<string, unknown>[] };
+    registry.projects.forEach((project) => delete project['labels']);
+    writeFileSync(file, JSON.stringify(registry));
+    const listed = await sandbox.cli(['list', '--json']);
+    expect(listed.code, listed.stderr).toBe(0);
+    expect((JSON.parse(listed.stdout) as { labels: string[] }[]).every((p) => p.labels.length === 0)).toBe(true);
+    expect((await sandbox.cli(['label', 'add', 'notes', 'back'])).code).toBe(0);
+  });
+});

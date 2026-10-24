@@ -38,9 +38,9 @@ describe('read commands', () => {
     it('lists id, name, aliases, parent and main path, virtual projects included', async () => {
       const result = await h.cli(['list']);
       const lines = result.out.split('\n');
-      expect(lines[0]).toMatch(/^ID\s+NAME\s+ALIASES\s+PARENT\s+MAIN PATH$/);
-      expect(lines.find((l) => l.includes(idOf('shop')))).toMatch(new RegExp(`${idOf('shop')}\\s+shop\\s+sh\\s+base\\s+${shop}$`));
-      expect(lines.find((l) => l.includes(idOf('base')))).toMatch(/base\s+-\s+-\s+\(virtual\)$/);
+      expect(lines[0]).toMatch(/^ID\s+NAME\s+ALIASES\s+PARENT\s+LABELS\s+MAIN PATH$/);
+      expect(lines.find((l) => l.includes(idOf('shop')))).toMatch(new RegExp(`${idOf('shop')}\\s+shop\\s+sh\\s+base\\s+-\\s+${shop}$`));
+      expect(lines.find((l) => l.includes(idOf('base')))).toMatch(/base\s+-\s+-\s+-\s+\(virtual\)$/);
     });
 
     it('prints the projects as a JSON array', async () => {
@@ -57,6 +57,7 @@ describe('read commands', () => {
       expect(result.out.split('\n')).toEqual([
         `shop (${idOf('shop')})`,
         '  aliases: sh',
+        '  labels: none',
         `  parent chain: base > shop`,
         '  paths:',
         `    ${shop} (main)`,
@@ -108,7 +109,7 @@ describe('read commands', () => {
     it('reports the cwd and the registered path that contains it', async () => {
       const sub = h.dir('shop/src/deep');
       const result = await h.cli(['resolve'], { cwd: sub });
-      expect(result.out.split('\n')).toEqual([`project: shop (${idOf('shop')})`, 'source: cwd', `path: ${shop} (cwd)`, `registry: ${h.registryDir}`]);
+      expect(result.out.split('\n')).toEqual([`project: shop (${idOf('shop')})`, 'labels: none', 'source: cwd', `path: ${shop} (cwd)`, `registry: ${h.registryDir}`]);
     });
 
     it('uses the second path when the cwd is inside it', async () => {

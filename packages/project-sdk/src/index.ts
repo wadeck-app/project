@@ -5,6 +5,18 @@ export { defaultRegistryDir } from './registryDir.js';
 export { generateId, isIdLike } from './ids.js';
 export { type LabelKind, deriveName, normalizeLabel } from './labels.js';
 export { describeProject, isVirtual, mainPath } from './projects.js';
+export {
+  type ParsedLabel,
+  filterProjects,
+  formatLabel,
+  hasLabel,
+  labelsOf,
+  matchesSelectors,
+  normalizeProjectLabel,
+  parseLabel,
+} from './projectLabels.js';
+export { MAX_PROJECT_LABELS } from './projectLabels.js';
+export { addLabels, removeLabels } from './labelMutations.js';
 export { assertDirectory, isSameOrInside, normalizePath, pathKey } from './paths.js';
 
 export { writeFileAtomic, type AtomicWriteOptions } from './atomicWrite.js';

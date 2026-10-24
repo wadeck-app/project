@@ -5,6 +5,7 @@ import { type LabelKind, normalizeLabel } from './labels.js';
 import { assertDirectory, normalizePath, pathKey } from './paths.js';
 import type { Project, Registry } from './types.js';
 import { describeProject } from './projects.js';
+import { validateProjectLabels } from './projectLabels.js';
 import { realPathKey } from './realPath.js';
 
 export interface ValidateOptions {
@@ -36,6 +37,7 @@ function checkIdentity(project: Project): void {
   }
   checkLabel(project, 'name', project.name);
   project.aliases.forEach((alias) => checkLabel(project, 'alias', alias));
+  validateProjectLabels(project);
 }
 
 function checkLabelsUnique(projects: Project[]): void {

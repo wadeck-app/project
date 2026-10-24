@@ -3,6 +3,7 @@ import { addCommand } from './add.js';
 import { CLI_COMMANDS } from './cli.js';
 import { aliasAddCommand, aliasRemoveCommand } from './alias.js';
 import { gitClearCommand, gitSetCommand } from './git.js';
+import { labelAddCommand, labelRemoveCommand } from './label.js';
 import { listCommand } from './list.js';
 import { parentClearCommand, parentSetCommand } from './parent.js';
 import { pathCommand } from './path.js';
@@ -30,6 +31,8 @@ export const COMMANDS: Command[] = [
   pathsRemoveCommand,
   pathsMoveCommand,
   pathsMainCommand,
+  labelAddCommand,
+  labelRemoveCommand,
   removeCommand,
   ...CLI_COMMANDS,
 ];

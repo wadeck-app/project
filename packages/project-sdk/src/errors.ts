@@ -186,3 +186,26 @@ export class UnsupportedSchemaVersionError extends ProjectError {
     this.supported = details.supported;
   }
 }
+
+export class InvalidProjectLabelError extends ProjectError {
+  /** The label (or selector) as it was given. */
+  readonly input: string;
+  readonly reason: string;
+
+  constructor(message: string, details: { input: string; reason: string }) {
+    super('INVALID_PROJECT_LABEL', message);
+    this.input = details.input;
+    this.reason = details.reason;
+  }
+}
+
+export class ProjectLabelNotFoundError extends ProjectError {
+  readonly label: string;
+  readonly project: ProjectRef;
+
+  constructor(message: string, details: { label: string; project: ProjectRef }) {
+    super('PROJECT_LABEL_NOT_FOUND', message);
+    this.label = details.label;
+    this.project = details.project;
+  }
+}

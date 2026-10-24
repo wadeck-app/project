@@ -19,6 +19,8 @@ Then `npm i -g @wadeck-app/project-cli` gives the `project` command (node >= 22)
 
 After every command a detached background run checks the `latest` channel and installs a newer version with `npm install -g`. A new version must pass `project cli self-check` or it is rolled back. The next command prints a notice on stderr (`Updated to ...`, `rolled back`, or `Background update failed (...)`).
 
+The notice of a successful update is shown once (`update-notice-shown.json` remembers it) but the update state is kept, so `project cli rollback` keeps working until the next update; `cli rollback` itself shows no notice and does not touch the state. Failure notices are shown once and cleared.
+
 | Command | What it does |
 |---|---|
 | `project cli update` | Update now, ignoring the cache and `autoUpdate: false`; prints current, latest and status. `--check` only shows the available version, `--log` prints the update log (same file as `cli logs`) |
@@ -49,6 +51,8 @@ If the log cannot be written the command still runs and one line `warning: could
 ## Usage
 
 `project --help` lists the commands. `--project` / `-p <ref>` is accepted anywhere in argv; `--json` prints machine output on stdout. Default target of a command without `<ref>`: `--project`, then `PROJECT_PROJECT`, then the project containing the cwd.
+
+Labels (meta information such as `state::production` or `sandbox`; rules in the SDK README): `project add --label <label>` (repeatable), `project label add|remove <ref> <label>...` (`<ref>` is required; removing a label the project does not have is an error), `project list --label <selector>` (repeatable, AND; `key::value`, a key, or a bare value). `list` has a LABELS column, `show` and `resolve` print them, and `--json` of list, show, add, resolve and the other project outputs has `labels` (always an array). Label changes are logged like other mutations (`mutation: label add shop (id) +state::production`). Labels are not inherited by child projects.
 
 `project remove` requires an explicit `<ref>` (no `--project`, no environment variable, no cwd): a destructive command never acts on an implicit target.
 

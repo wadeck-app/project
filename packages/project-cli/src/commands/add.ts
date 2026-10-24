@@ -1,7 +1,7 @@
 import { InvalidLabelError, LabelTakenError, addProject, deriveName, describeProject, normalizePath } from '@wadeck-app/project-sdk';
 import type { PlainCommand } from '../command.js';
 import { UsageError } from '../errors.js';
-import { pathLines } from '../format.js';
+import { forJson, labelList, pathLines } from '../format.js';
 
 const LABEL = 'project add';
 
@@ -28,6 +28,7 @@ export const addCommand: PlainCommand = {
     alias: { type: 'list', description: 'Alias, repeatable' },
     parent: { type: 'string', valueName: 'ref', description: 'Parent project (name, alias or id) it inherits its configuration from' },
     git: { type: 'string', valueName: 'value', description: 'Git repository of the project, stored as given' },
+    label: { type: 'list', valueName: 'label', description: "Label, 'key::value' or a bare value, repeatable" },
     virtual: { type: 'boolean', description: 'Register a project without path, to hold configuration shared by others (needs --name)' },
   },
   run: async (context, args) => {
@@ -47,10 +48,10 @@ export const addCommand: PlainCommand = {
     try {
       const project = await addProject(
         context.registryDir,
-        { name, aliases: options.list('alias'), ...(path === undefined ? {} : { path }), ...(parent === undefined ? {} : { parent }), ...(git === undefined ? {} : { git }) },
+        { name, aliases: options.list('alias'), labels: options.list('label'), ...(path === undefined ? {} : { path }), ...(parent === undefined ? {} : { parent }), ...(git === undefined ? {} : { git }) },
         { lock: context.lock },
       );
-      return { json: project, lines: [`added ${describeProject(project)}`, ...pathLines(project, '  path: ')], mutation: `add project ${describeProject(project)}` };
+      return { json: forJson(project), lines: [`added ${describeProject(project)}`, ...pathLines(project, '  path: '), ...((project.labels ?? []).length > 0 ? [`  labels: ${labelList(project)}`] : [])], mutation: `add project ${describeProject(project)}` };
     } catch (error) {
       if (explicitName === undefined && error instanceof LabelTakenError && error.kind === 'name') {
         throw new UsageError(`${error.message}; the name comes from the folder: pass --name <name>`, LABEL);

@@ -1,5 +1,6 @@
 import { describeProject } from '@wadeck-app/project-sdk';
 import type { TargetCommand } from '../command.js';
+import { labelList } from '../format.js';
 
 export const resolveCommand: TargetCommand = {
   name: 'resolve',
@@ -10,9 +11,10 @@ export const resolveCommand: TargetCommand = {
   run: (context, { scope }) => {
     const { project, path, pathVia, source, via } = scope;
     return {
-      json: { id: project.id, name: project.name, source, via, path, pathVia, registryDir: context.registryDir },
+      json: { id: project.id, name: project.name, labels: project.labels ?? [], source, via, path, pathVia, registryDir: context.registryDir },
       lines: [
         `project: ${describeProject(project)}`,
+        `labels: ${labelList(project)}`,
         `source: ${via}`,
         `path: ${path === undefined ? 'none (virtual project)' : `${path} (${pathVia})`}`,
         `registry: ${context.registryDir}`,

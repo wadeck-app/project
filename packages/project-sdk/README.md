@@ -14,7 +14,7 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
   projects/<id>/<tool>/{config,data}/
 ```
 
-`Project = { id, name, aliases, parent?, paths: { path, main }[], git?, createdAt }`. Paths are stored normalized (absolute, forward slashes, uppercase drive letter on Windows).
+`Project = { id, name, aliases, parent?, paths: { path, main }[], git?, labels?, createdAt }`. Paths are stored normalized (absolute, forward slashes, uppercase drive letter on Windows).
 
 ## Rules
 
@@ -31,7 +31,8 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
 |---|---|
 | Location | `defaultRegistryDir(env, home?)`, `projectDir(registryDir, id)` |
 | Read | `REGISTRY_SCHEMA_VERSION`, `loadRegistry`, `loadDeleted`, `validateRegistry(registry, options?)` (`checkPaths` defaults to false), `registryFilePath`, `deletedFilePath` |
-| Projects | `addProject`, `renameProject`, `addAlias`, `removeAlias`, `setParent`, `setGit`, `removeProject(registryDir, ref, { recursive })` |
+| Labels | `addLabels(registryDir, ref, labels)`, `removeLabels(registryDir, ref, labels)`, `parseLabel`, `formatLabel`, `normalizeProjectLabel`, `labelsOf(project)`, `hasLabel(project, selector)`, `matchesSelectors(project, selectors)`, `filterProjects(registry, selectors)` |
+| Projects | `addProject` (`labels?`), `renameProject`, `addAlias`, `removeAlias`, `setParent`, `setGit`, `removeProject(registryDir, ref, { recursive })` |
 | Paths | `addPath(.., { main })`, `removePath(.., { newMain })`, `movePath`, `setMain` |
 | Resolution | `resolveReference`, `findProjectForPath`, `resolveScope` (flag > env > cwd; `label` names the source of an explicit reference), `describeResolution`, `requirePath` |
 | Inheritance | `getChain`, `getConfigLayers`, `projectToolDir(registryDir, id, tool, 'config' or 'data', { ensure })` |
@@ -48,6 +49,8 @@ All extend `ProjectError` (`code`, actionable message). Messages name no API opt
 | Class | Code (data) |
 |---|---|
 | `InvalidLabelError` | `INVALID_LABEL` |
+| `InvalidProjectLabelError` | `INVALID_PROJECT_LABEL` (`input`, `reason`) |
+| `ProjectLabelNotFoundError` | `PROJECT_LABEL_NOT_FOUND` (`label`, `project`) |
 | `LabelTakenError` | `LABEL_TAKEN` (`kind`, `label`, `owner?`) |
 | `InvalidIdError` | `INVALID_ID` |
 | `InvalidPathError` | `INVALID_PATH` (`path?`) |
@@ -68,6 +71,15 @@ All extend `ProjectError` (`code`, actionable message). Messages name no API opt
 | `DanglingParentError` | `DANGLING_PARENT` |
 | `ParentCycleError` | `PARENT_CYCLE` |
 | `ConfigSchemaError` | `CONFIG_SCHEMA` |
+
+## Project labels
+
+Free meta information on a project (`state::production`, `sandbox`): a set of strings in `labels` (always `[]` for a new project; missing in a registry written before labels existed, read as empty; no schema version change).
+
+- A label is `key::value` or a bare `value`, lowercased; each part matches `^[a-z0-9][a-z0-9._-]*$`, at most 64 characters, at most one `::`. Several values for one key are allowed. At most 32 labels per project. `validateRegistry` checks all of it on write.
+- `addLabels` is a set operation (an existing label is a no-op). `removeLabels` throws `ProjectLabelNotFoundError` for a label the project does not have, so a typo is loud; nothing is removed then.
+- Selectors (`hasLabel`, `matchesSelectors`, `filterProjects`): `key::value` matches exactly; a bare selector matches a bare label of that value and any `key::*` label of that key; several selectors are AND. An invalid selector throws.
+- Labels are not inherited through the parent chain, and are kept by the soft delete.
 
 ## Config layers
 

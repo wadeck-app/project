@@ -30,3 +30,11 @@ describe('updateNoticeLines', () => {
     expect(updateNoticeLines({ ...base, status: 'failed' })).toEqual(['[project] Background update failed (no reason recorded). Run: project cli update']);
   });
 });
+
+describe('updateNoticeLines with a previous version', () => {
+  it('tells how to go back when the previous version is known', () => {
+    expect(updateNoticeLines({ ...base, status: 'success', targetVersion: '2', previousVersion: '1' })).toEqual([
+      '[project] Updated to v2 (was v1). To go back: project cli rollback',
+    ]);
+  });
+});

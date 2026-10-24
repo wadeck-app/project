@@ -29,11 +29,12 @@ Where project metadata and per-project tool config live. Owned and accessed only
 | 24 | Amends #19: removing a project with children is an error suggesting `--recursive` (soft-deletes the project and its descendants). | No dangling parents | 2026-10-24 |
 | 25 | Cwd with several paths: inside one of the project's paths, that path is used; `main` only when running outside the project. | What `main` is for | 2026-10-24 |
 | 26 | Full validation (uniqueness, one `main`, parents/cycles, paths exist) on write only; reads keep cheap loud checks (unreadable JSON, unknown schema version, ambiguous reference). | Path-existence checks are slow | 2026-10-24 |
+| 28 | Labels: optional `labels: string[]` on a project, each `key::value` or bare `value`, lowercase, syntax `^[a-z0-9][a-z0-9._-]*$` max 64, at most one `::`, max 32 per project, set semantics (several values per key allowed), not inherited, kept on soft delete. Details in `_index.md` Decision #28. | Meta information (state::production, sandbox, ...) | 2026-10-24 |
 | 4 | All registry writes (index and per-project files) are atomic (write to temp file, then rename). | User: "atomic write is important"; a half-written index would break every command | 2026-10-24 |
 
 ## Design (as stated; unsettled points listed below)
 
-- `registry.json`: index of projects (id, name, aliases, parent id, paths with optional tags, optional git repo).
+- `registry.json`: index of projects (id, name, aliases, labels, parent id, paths with optional tags, optional git repo).
 - `<configDir>/<project>/`: per-tool config sub-folders (task, queue, flow, ...). Folder naming (id vs name) is open.
 - The SDK exposes per-tool effective config with inheritance (rule: Q13).
 - A flag/env pointing the SDK at a non-production registry must fail loudly if the target is missing or invalid (P-1); a silent fallback to the production registry would defeat the purpose.

@@ -14,6 +14,8 @@ export interface Project {
   paths: ProjectPath[];
   /** One free string, stored as given. */
   git?: string;
+  /** Free labels (`key::value` or a bare `value`), see projectLabels.ts. Missing in a registry written before labels existed: read it as empty. Not inherited. */
+  labels?: string[];
   createdAt: string;
 }
 

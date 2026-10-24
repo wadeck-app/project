@@ -7,7 +7,7 @@ import type { UpdateState } from '@wadeck-app/shared-cli';
 export function updateNoticeLines(state: UpdateState | null): string[] {
   switch (state?.status) {
     case 'success':
-      return [`[project] Updated to v${state.targetVersion ?? state.newVersion}`];
+      return [`[project] Updated to v${state.targetVersion ?? state.newVersion}${state.previousVersion === undefined ? '' : ` (was v${state.previousVersion}). To go back: project cli rollback`}`];
     case 'rolled-back':
       return [`[project] Update to v${state.targetVersion} failed (self-check failed). Rolled back to v${state.previousVersion}. Run: project cli logs`];
     case 'failed':

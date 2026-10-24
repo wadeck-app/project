@@ -1,10 +1,10 @@
 import { type Project, addPath, describeProject, movePath, normalizePath, removePath, setMain } from '@wadeck-app/project-sdk';
 import type { CommandOutput, TargetCommand } from '../command.js';
-import { pathLines } from '../format.js';
+import { forJson, pathLines } from '../format.js';
 
 /** The sentence about the change, then the resulting paths of the project; `mutation` is the line for the log. */
 function result(project: Project, sentence: string, mutation: string): CommandOutput {
-  return { json: project, lines: [sentence, '  paths:', ...pathLines(project, '    ')], mutation };
+  return { json: forJson(project), lines: [sentence, '  paths:', ...pathLines(project, '    ')], mutation };
 }
 
 export const pathsAddCommand: TargetCommand = {

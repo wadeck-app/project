@@ -41,6 +41,8 @@ interface CommandBase {
   /** Required positional arguments (after the optional project <ref>, if any). */
   args: string[];
   optionalArgs?: string[];
+  /** The last required argument may be given several times (at least once). */
+  variadic?: boolean;
 }
 
 /** A command that does not act on one existing project. */

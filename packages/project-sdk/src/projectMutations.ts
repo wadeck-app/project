@@ -3,6 +3,7 @@ import { generateId } from './ids.js';
 import { assertLabelsFree, normalizeLabel } from './labels.js';
 import { assertPathFree } from './pathOwnership.js';
 import { assertDirectory, pathKey } from './paths.js';
+import { MAX_PROJECT_LABELS, assertLabelCount, normalizeLabelSet } from './projectLabels.js';
 import { resolveReference } from './references.js';
 import { loadDeleted } from './registryIo.js';
 import type { Project } from './types.js';
@@ -17,6 +18,8 @@ export interface AddProjectInput {
   /** Reference (name, alias or id) of the parent project. */
   parent?: string;
   git?: string;
+  /** Labels of the project (see parseLabel), normalized and deduplicated. */
+  labels?: string[];
 }
 
 /** Registers a project. A project without path is "virtual". */
@@ -28,6 +31,8 @@ export function addProject(registryDir: string, input: AddProjectInput, options:
       const aliases = (input.aliases ?? []).map((alias) => normalizeLabel(alias, 'alias'));
       assertLabelsFree(registry, [{ label: name, kind: 'name' }, ...aliases.map((label) => ({ label, kind: 'alias' as const }))]);
       const parent = input.parent === undefined ? undefined : resolveReference(registry, input.parent);
+      const labels = normalizeLabelSet(input.labels ?? []);
+      assertLabelCount(labels, labels[MAX_PROJECT_LABELS] ?? '');
       let path: string | undefined;
       if (input.path !== undefined) {
         path = assertPathFree(registry, input.path);
@@ -41,6 +46,7 @@ export function addProject(registryDir: string, input: AddProjectInput, options:
         aliases,
         ...(parent === undefined ? {} : { parent: parent.id }),
         paths: path === undefined ? [] : [{ path, main: true }],
+        labels,
         ...(input.git === undefined ? {} : { git: input.git }),
         createdAt: new Date().toISOString(),
       };

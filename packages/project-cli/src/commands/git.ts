@@ -1,5 +1,6 @@
 import { describeProject, setGit } from '@wadeck-app/project-sdk';
 import type { TargetCommand } from '../command.js';
+import { forJson } from '../format.js';
 
 export const gitSetCommand: TargetCommand = {
   name: 'git set',
@@ -9,7 +10,7 @@ export const gitSetCommand: TargetCommand = {
   options: {},
   run: async (context, { scope }, [value]) => {
     const project = await setGit(context.registryDir, scope.project.id, value!, { lock: context.lock });
-    return { json: project, lines: [`git of ${describeProject(project)} is now ${value}`], mutation: `git set on ${describeProject(project)}` };
+    return { json: forJson(project), lines: [`git of ${describeProject(project)} is now ${value}`], mutation: `git set on ${describeProject(project)}` };
   },
 };
 
@@ -21,6 +22,6 @@ export const gitClearCommand: TargetCommand = {
   options: {},
   run: async (context, { scope }) => {
     const project = await setGit(context.registryDir, scope.project.id, null, { lock: context.lock });
-    return { json: project, lines: [`git of ${describeProject(project)} was cleared`], mutation: `git clear on ${describeProject(project)}` };
+    return { json: forJson(project), lines: [`git of ${describeProject(project)} was cleared`], mutation: `git clear on ${describeProject(project)}` };
   },
 };

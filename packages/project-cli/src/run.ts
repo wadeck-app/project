@@ -54,7 +54,7 @@ function withoutCommand(argv: readonly string[], dispatch: Dispatch, io: Io): nu
 /** Splits the positionals into the optional project <ref> and the command arguments, or fails with the expected syntax. */
 function splitPositionals(command: Command, positionals: readonly string[]): { ref: string | undefined; args: string[] } {
   const min = command.args.length + (command.target === 'explicit' ? 1 : 0);
-  const max = min + (command.optionalArgs?.length ?? 0) + (command.target === 'ref' ? 1 : 0);
+  const max = command.variadic === true ? Number.POSITIVE_INFINITY : min + (command.optionalArgs?.length ?? 0) + (command.target === 'ref' ? 1 : 0);
   if (positionals.length < min || positionals.length > max) {
     const given = positionals.length === 0 ? 'none' : positionals.map((p) => `'${p}'`).join(', ');
     throw new UsageError(`expected ${argsSyntax(command) || 'no argument'}, got ${given}`, `project ${command.name}`);

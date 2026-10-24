@@ -1,5 +1,6 @@
 import { describeProject, resolveReference, setParent } from '@wadeck-app/project-sdk';
 import type { TargetCommand } from '../command.js';
+import { forJson } from '../format.js';
 
 export const parentSetCommand: TargetCommand = {
   name: 'parent set',
@@ -10,7 +11,7 @@ export const parentSetCommand: TargetCommand = {
   run: async (context, { scope, registry }, [parentRef]) => {
     const project = await setParent(context.registryDir, scope.project.id, parentRef!, { lock: context.lock });
     const parent = resolveReference(registry, parentRef!);
-    return { json: project, lines: [`${describeProject(project)} now inherits from ${describeProject(parent)}`], mutation: `parent set ${describeProject(project)} -> ${describeProject(parent)}` };
+    return { json: forJson(project), lines: [`${describeProject(project)} now inherits from ${describeProject(parent)}`], mutation: `parent set ${describeProject(project)} -> ${describeProject(parent)}` };
   },
 };
 
@@ -22,6 +23,6 @@ export const parentClearCommand: TargetCommand = {
   options: {},
   run: async (context, { scope }) => {
     const project = await setParent(context.registryDir, scope.project.id, null, { lock: context.lock });
-    return { json: project, lines: [`${describeProject(project)} has no parent anymore`], mutation: `parent clear on ${describeProject(project)}` };
+    return { json: forJson(project), lines: [`${describeProject(project)} has no parent anymore`], mutation: `parent clear on ${describeProject(project)}` };
   },
 };
