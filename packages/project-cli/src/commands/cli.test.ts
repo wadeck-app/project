@@ -103,3 +103,28 @@ describe('project cli ...', () => {
     expect(result.err).toContain("'cli' needs a subcommand: version, update, rollback, self-check, logs");
   });
 });
+
+describe('project cli update --log', () => {
+  let h: Harness;
+
+  beforeEach(() => {
+    h = makeHarness();
+  });
+  afterEach(() => {
+    vi.clearAllMocks();
+    h.cleanup();
+  });
+
+  it("prints the update log: the updater writes to the same daily file as 'cli logs'", async () => {
+    const result = await h.cli(['cli', 'update', '--log']);
+    expect(result.code).toBe(0);
+    expect(meta.cliLogsCommand).toHaveBeenCalledWith(h.registryDir, { follow: false });
+    expect(meta.cliUpdateCommand).not.toHaveBeenCalled();
+  });
+
+  it('is described in the help of cli update', async () => {
+    const result = await h.cli(['cli', 'update', '--help']);
+    expect(result.out).toContain('--check');
+    expect(result.out).toContain('--log');
+  });
+});

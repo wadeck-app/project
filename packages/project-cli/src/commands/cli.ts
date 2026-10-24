@@ -29,8 +29,15 @@ const updateCommand: PlainCommand = {
   summary: 'Update now, whatever the cache or autoUpdate say (the CLI also updates itself in the background)',
   target: 'none',
   args: [],
-  options: { check: { type: 'boolean', description: 'Only show the available version, do not install it' } },
+  options: {
+    check: { type: 'boolean', description: 'Only show the available version, do not install it' },
+    log: { type: 'boolean', description: "Print the update log (the updater writes to the same daily file as 'project cli logs')" },
+  },
   run: async (context) => {
+    if (context.options.flag('log')) {
+      await cliLogsCommand(context.registryDir, { follow: false });
+      return PRINTED_BY_THE_COMMAND;
+    }
     if (context.options.flag('check')) {
       await cliVersionCommand(PACKAGE_NAME, currentVersion(), readChannelFromConfig(context.registryDir));
       return PRINTED_BY_THE_COMMAND;
@@ -74,7 +81,7 @@ const selfCheckCommand: PlainCommand = {
 
 const logsCommand: PlainCommand = {
   name: 'cli logs',
-  summary: "Print today's updater log",
+  summary: "Print today's log: the invocations of the CLI and the updater entries",
   target: 'none',
   args: [],
   options: { follow: { type: 'boolean', description: 'Keep printing new lines' } },

@@ -2,9 +2,9 @@ import { type Project, addPath, describeProject, movePath, normalizePath, remove
 import type { CommandOutput, TargetCommand } from '../command.js';
 import { pathLines } from '../format.js';
 
-/** The sentence about the change, then the resulting paths of the project. */
-function result(project: Project, sentence: string): CommandOutput {
-  return { json: project, lines: [sentence, '  paths:', ...pathLines(project, '    ')] };
+/** The sentence about the change, then the resulting paths of the project; `mutation` is the line for the log. */
+function result(project: Project, sentence: string, mutation: string): CommandOutput {
+  return { json: project, lines: [sentence, '  paths:', ...pathLines(project, '    ')], mutation };
 }
 
 export const pathsAddCommand: TargetCommand = {
@@ -16,7 +16,7 @@ export const pathsAddCommand: TargetCommand = {
   run: async (context, { scope }, [path]) => {
     const absolute = normalizePath(path!, context.cwd);
     const project = await addPath(context.registryDir, scope.project.id, absolute, { main: context.options.flag('main') }, { lock: context.lock });
-    return result(project, `added path ${absolute} to ${describeProject(project)}`);
+    return result(project, `added path ${absolute} to ${describeProject(project)}`, `paths add ${describeProject(project)}: ${absolute}`);
   },
 };
 
@@ -31,7 +31,7 @@ export const pathsRemoveCommand: TargetCommand = {
     const newMain = context.options.value('new-main');
     const flags = newMain === undefined ? {} : { newMain: normalizePath(newMain, context.cwd) };
     const project = await removePath(context.registryDir, scope.project.id, absolute, flags, { lock: context.lock });
-    return result(project, `removed path ${absolute} from ${describeProject(project)}`);
+    return result(project, `removed path ${absolute} from ${describeProject(project)}`, `paths remove ${describeProject(project)}: ${absolute}`);
   },
 };
 
@@ -45,7 +45,7 @@ export const pathsMoveCommand: TargetCommand = {
     const source = normalizePath(from!, context.cwd);
     const target = normalizePath(to!, context.cwd);
     const project = await movePath(context.registryDir, scope.project.id, source, target, { lock: context.lock });
-    return result(project, `moved path ${source} to ${target} in ${describeProject(project)}`);
+    return result(project, `moved path ${source} to ${target} in ${describeProject(project)}`, `paths move ${describeProject(project)}: ${source} -> ${target}`);
   },
 };
 
@@ -58,6 +58,6 @@ export const pathsMainCommand: TargetCommand = {
   run: async (context, { scope }, [path]) => {
     const absolute = normalizePath(path!, context.cwd);
     const project = await setMain(context.registryDir, scope.project.id, absolute, { lock: context.lock });
-    return result(project, `main path of ${describeProject(project)} is now ${absolute}`);
+    return result(project, `main path of ${describeProject(project)} is now ${absolute}`, `paths main ${describeProject(project)}: ${absolute}`);
   },
 };

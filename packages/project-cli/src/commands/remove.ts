@@ -13,6 +13,7 @@ export const removeCommand: TargetCommand = {
     return {
       json: removed,
       lines: removed.map((p) => `removed ${describeProject(p)}; its data folder was kept: ${projectFolder(context.registryDir, p)}`),
+      mutation: `remove ${removed.map(describeProject).join(', ')}`,
     };
   },
 };

@@ -21,15 +21,30 @@ After every command a detached background run checks the `latest` channel and in
 
 | Command | What it does |
 |---|---|
-| `project cli update` | Update now, ignoring the cache and `autoUpdate: false`; prints current, latest and status. `--check` only shows the available version |
+| `project cli update` | Update now, ignoring the cache and `autoUpdate: false`; prints current, latest and status. `--check` only shows the available version, `--log` prints the update log (same file as `cli logs`) |
 | `project cli version` | Installed and available version |
 | `project cli rollback` | Reinstall the version before the last update |
-| `project cli logs [--follow]` | Today's updater log |
+| `project cli logs [--follow]` | Today's log: the invocations of the CLI and the updater entries |
 | `project cli self-check` | Health checks (temporary registry, nothing is written to yours) |
 
 Settings in `<registry folder>/config.yml` (the updater keeps its state, cache and logs there, next to `registry.json`): `autoUpdate: false`, `channel: <dist-tag>`, `checkInterval: <30m|4h|...>`.
 
 An update that cannot be verified is not attempted: if `npm root -g` fails, the run fails loudly (visible in `project cli update`, and as the failure notice of the next command).
+
+## Logs
+
+One file per day, `<registry folder>/logs/YYYY-MM-DD.ndjson` (`~/.config/project/logs/` by default), one JSON object per line: `{ "ts", "level", "msg" }`. The updater writes to the same file in the same format. Print it with `project cli logs` (`--follow` to keep reading), or `project cli update --log`.
+
+Each invocation writes, in order:
+
+| Entry | `msg` |
+|---|---|
+| the command | `cmd: project <args>` (credentials in URLs are replaced by `***`) |
+| the project found | the resolution line also printed on stderr |
+| each registry change | `mutation: <what> <name> (<id>)`: names, ids and paths only, never values such as the git field, nor file contents |
+| the outcome | `exit <code>`, plus the error code in parentheses when it failed (`exit 1 (PATH_OWNED)`, `USAGE`, `CLI_ERROR`, `UNEXPECTED`), at `error` level |
+
+If the log cannot be written the command still runs and one line `warning: could not write the log (<reason>)` goes to stderr.
 
 ## Usage
 

@@ -6,6 +6,7 @@ import { type Dispatch, splitCommand } from './dispatch.js';
 import { CliError, UsageError } from './errors.js';
 import { argsSyntax, commandHelp, groupHelp, topHelp } from './help.js';
 import { hintFor } from './hints.js';
+import { type InvocationLog, openInvocationLog } from './invocationLog.js';
 import { lockOptions } from './lockNotice.js';
 import { optionsOf } from './options.js';
 import { resolveTarget } from './target.js';
@@ -62,7 +63,7 @@ function splitPositionals(command: Command, positionals: readonly string[]): { r
   return { ref: hasRef ? positionals[0] : undefined, args: positionals.slice(hasRef ? 1 : 0) };
 }
 
-async function execute(command: Command, rest: readonly string[], io: Io, env: NodeJS.ProcessEnv, cwd: string): Promise<number> {
+async function execute(command: Command, rest: readonly string[], io: Io, env: NodeJS.ProcessEnv, cwd: string, log: InvocationLog): Promise<number> {
   const label = `project ${command.name}`;
   const parsed = parseArgs(rest, optionsOf(command), label);
   if (parsed.options.flag('help')) {
@@ -70,13 +71,16 @@ async function execute(command: Command, rest: readonly string[], io: Io, env: N
   }
   const { ref, args } = splitPositionals(command, parsed.positionals);
   const registryDir = defaultRegistryDir(env);
-  const context: Context = { io, env, cwd, registryDir, options: parsed.options, lock: lockOptions(io) };
+  const context: Context = { io, env, cwd, registryDir, options: parsed.options, lock: lockOptions(io), log };
   let output: CommandOutput;
   if (command.target === 'none') {
     io.err(`registry: ${registryDir}`);
     output = await command.run(context, args);
   } else {
     output = await command.run(context, resolveTarget(context, ref, label), args);
+  }
+  if (output.mutation !== undefined) {
+    log.mutation(output.mutation);
   }
   if (parsed.options.flag('json')) {
     // A command that wrote its own output has no result to print.
@@ -85,15 +89,21 @@ async function execute(command: Command, rest: readonly string[], io: Io, env: N
   return print(io, output.lines);
 }
 
-function report(error: unknown, io: Io): number {
+interface Failure {
+  exitCode: number;
+  /** Stable identifier of the failure, written to the log. */
+  code: string;
+}
+
+function report(error: unknown, io: Io): Failure {
   if (error instanceof UsageError) {
     io.err(`error: ${error.message}`);
     io.err(`Run '${error.command} --help' for usage.`);
-    return EXIT_USAGE;
+    return { exitCode: EXIT_USAGE, code: 'USAGE' };
   }
   if (error instanceof CliError) {
     io.err(`error: ${error.message}`);
-    return EXIT_ERROR;
+    return { exitCode: EXIT_ERROR, code: 'CLI_ERROR' };
   }
   if (error instanceof ProjectError) {
     io.err(`error: ${error.message}`);
@@ -101,23 +111,29 @@ function report(error: unknown, io: Io): number {
     if (hint !== undefined) {
       io.err(`hint: ${hint}`);
     }
-    return EXIT_ERROR;
+    return { exitCode: EXIT_ERROR, code: error.code };
   }
   io.err('unexpected error (this is a bug of the project CLI, please report it with the output below):');
   io.err(error instanceof Error ? (error.stack ?? String(error)) : String(error));
-  return EXIT_UNEXPECTED;
+  return { exitCode: EXIT_UNEXPECTED, code: 'UNEXPECTED' };
 }
 
 /**
  * Runs the CLI and returns the exit code: 0 success, 1 a ProjectError, 2 a usage error, 70 an unexpected exception.
  * Never touches `process`: the caller supplies argv, the writers, the environment and the working directory.
+ * Every invocation is logged in <config folder>/logs (see invocationLog.ts).
  */
 export async function run(argv: readonly string[], io: Io, env: NodeJS.ProcessEnv, cwd: string): Promise<number> {
+  const log = openInvocationLog(defaultRegistryDir(env), argv, (reason) => io.err(`warning: could not write the log (${reason})`));
   try {
     const dispatch = splitCommand(argv, COMMANDS.map((c) => c.name));
     const command = COMMANDS.find((c) => c.name === dispatch.name);
-    return command === undefined ? withoutCommand(argv, dispatch, io) : await execute(command, dispatch.rest, io, env, cwd);
+    const exitCode = command === undefined ? withoutCommand(argv, dispatch, io) : await execute(command, dispatch.rest, io, env, cwd, log);
+    log.outcome(exitCode);
+    return exitCode;
   } catch (error) {
-    return report(error, io);
+    const failure = report(error, io);
+    log.outcome(failure.exitCode, failure.code);
+    return failure.exitCode;
   }
 }

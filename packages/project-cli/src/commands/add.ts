@@ -50,7 +50,7 @@ export const addCommand: PlainCommand = {
         { name, aliases: options.list('alias'), ...(path === undefined ? {} : { path }), ...(parent === undefined ? {} : { parent }), ...(git === undefined ? {} : { git }) },
         { lock: context.lock },
       );
-      return { json: project, lines: [`added ${describeProject(project)}`, ...pathLines(project, '  path: ')] };
+      return { json: project, lines: [`added ${describeProject(project)}`, ...pathLines(project, '  path: ')], mutation: `add project ${describeProject(project)}` };
     } catch (error) {
       if (explicitName === undefined && error instanceof LabelTakenError && error.kind === 'name') {
         throw new UsageError(`${error.message}; the name comes from the folder: pass --name <name>`, LABEL);

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -305,3 +305,61 @@ describe('end-to-end: the update notice', () => {
     expect(result.stderr).toContain('[project] Background update failed (npm root -g failed). Run: project cli update');
   });
 });
+
+describe('end-to-end: the logs', () => {
+  let sandbox: Sandbox;
+
+  beforeAll(() => {
+    sandbox = makeSandbox();
+  });
+  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  it('shows the invocations, their outcome and the updater entries of the same daily file with cli logs', async () => {
+    await sandbox.cli(['add', '--virtual', '--name', 'base']);
+    await sandbox.cli(['add', '--virtual', '--name', 'base']);
+    // The updater (shared-updater) appends its own entries, same file and format.
+    const file = join(sandbox.registryDir, 'logs', `${today()}.ndjson`);
+    appendFileSync(file, `${JSON.stringify({ ts: new Date().toISOString(), level: 'info', msg: '@wadeck-app/project-cli checking for updates (current: 1)' })}\n`);
+    const logs = await sandbox.cli(['cli', 'logs']);
+    expect(logs.code, logs.stderr).toBe(0);
+    expect(logs.stdout).toContain('"msg":"cmd: project add --virtual --name base"');
+    expect(logs.stdout).toContain('"msg":"mutation: add project base (');
+    expect(logs.stdout).toContain('"level":"error","msg":"exit 1 (LABEL_TAKEN)"');
+    expect(logs.stdout).toContain('checking for updates (current: 1)');
+    const updateLog = await sandbox.cli(['cli', 'update', '--log']);
+    expect(updateLog.stdout).toContain('checking for updates (current: 1)');
+  });
+
+  it('follows the log: prints what is there, then new lines (stopped by the test)', async () => {
+    const child = spawn(process.execPath, [entry, 'cli', 'logs', '--follow'], { env: sandbox.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (chunk: Buffer) => (out += chunk.toString()));
+    try {
+      await waitFor(() => out.includes('cmd: project cli logs --follow'));
+      await sandbox.cli(['list']);
+      await waitFor(() => out.includes('cmd: project list'));
+    } finally {
+      child.kill();
+    }
+  });
+
+  it('never writes to the real config folder of the user', async () => {
+    const real = join(homedir(), '.config', 'project', 'logs', `${today()}.ndjson`);
+    const sizeBefore = existsSync(real) ? statSync(real).size : undefined;
+    await sandbox.cli(['list']);
+    expect(existsSync(real) ? statSync(real).size : undefined).toBe(sizeBefore);
+    expect(existsSync(join(sandbox.registryDir, 'logs', `${today()}.ndjson`))).toBe(true);
+  });
+});
+
+async function waitFor(condition: () => boolean): Promise<void> {
+  for (let i = 0; i < 200; i++) {
+    if (condition()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error('timed out waiting for the log to show the expected line');
+}

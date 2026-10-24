@@ -9,6 +9,6 @@ export const renameCommand: TargetCommand = {
   options: {},
   run: async (context, { scope }, [newName]) => {
     const project = await renameProject(context.registryDir, scope.project.id, newName!, { lock: context.lock });
-    return { json: project, lines: [`renamed ${scope.project.name} -> ${project.name} (${project.id})`] };
+    return { json: project, lines: [`renamed ${scope.project.name} -> ${project.name} (${project.id})`], mutation: `rename ${scope.project.name} (${project.id}) -> ${project.name}` };
   },
 };

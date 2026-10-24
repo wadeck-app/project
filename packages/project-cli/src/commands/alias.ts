@@ -9,7 +9,7 @@ export const aliasAddCommand: TargetCommand = {
   options: {},
   run: async (context, { scope }, [alias]) => {
     const project = await addAlias(context.registryDir, scope.project.id, alias!, { lock: context.lock });
-    return { json: project, lines: [`added alias '${alias}' to ${describeProject(project)}`] };
+    return { json: project, lines: [`added alias '${alias}' to ${describeProject(project)}`], mutation: `alias add '${alias}' to ${describeProject(project)}` };
   },
 };
 
@@ -21,6 +21,6 @@ export const aliasRemoveCommand: TargetCommand = {
   options: {},
   run: async (context, { scope }, [alias]) => {
     const project = await removeAlias(context.registryDir, scope.project.id, alias!, { lock: context.lock });
-    return { json: project, lines: [`removed alias '${alias}' from ${describeProject(project)}`] };
+    return { json: project, lines: [`removed alias '${alias}' from ${describeProject(project)}`], mutation: `alias remove '${alias}' from ${describeProject(project)}` };
   },
 };

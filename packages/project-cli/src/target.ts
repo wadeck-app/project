@@ -19,6 +19,8 @@ export function resolveTarget(context: Context, ref: string | undefined, label: 
     ...(context.env[PROJECT_ENV] === undefined ? {} : { env: context.env[PROJECT_ENV] }),
     envName: PROJECT_ENV,
   });
-  context.io.err(describeResolution(scope, { registryDir: context.registryDir }));
+  const line = describeResolution(scope, { registryDir: context.registryDir });
+  context.io.err(line);
+  context.log.resolution(line);
   return { registry, scope };
 }
