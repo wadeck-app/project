@@ -50,6 +50,7 @@ All extend `ProjectError` (`code`, actionable message). Messages name no API opt
 |---|---|
 | `InvalidLabelError` | `INVALID_LABEL` |
 | `InvalidProjectLabelError` | `INVALID_PROJECT_LABEL` (`input`, `reason`) |
+| `InvalidLabelSelectorError` | `INVALID_LABEL_SELECTOR` (`input`, `reason`) |
 | `ProjectLabelNotFoundError` | `PROJECT_LABEL_NOT_FOUND` (`label`, `project`) |
 | `LabelTakenError` | `LABEL_TAKEN` (`kind`, `label`, `owner?`) |
 | `InvalidIdError` | `INVALID_ID` |
@@ -78,7 +79,17 @@ Free meta information on a project (`state::production`, `sandbox`): a set of st
 
 - A label is `key::value` or a bare `value`, lowercased; each part matches `^[a-z0-9][a-z0-9._-]*$`, at most 64 characters, at most one `::`. Several values for one key are allowed. At most 32 labels per project. `validateRegistry` checks all of it on write.
 - `addLabels` is a set operation (an existing label is a no-op). `removeLabels` throws `ProjectLabelNotFoundError` for a label the project does not have, so a typo is loud; nothing is removed then.
-- Selectors (`hasLabel`, `matchesSelectors`, `filterProjects`): `key::value` matches exactly; a bare selector matches a bare label of that value and any `key::*` label of that key; several selectors are AND. An invalid selector throws.
+- Selectors (`hasLabel`, `matchesSelectors`, `filterProjects`), several are AND, wildcards exist here and never in stored labels:
+
+  | Selector | Matches |
+  |---|---|
+  | `key::value` | exactly this label |
+  | `key::*` | any label with this key (keyed labels only: a bare label has no key) |
+  | `*::value` | any label with this value, keyed or bare |
+  | `*::*` | any label (a project with at least one label) |
+  | `token` | shorthand: a bare label `token`, or any label with the key `token` |
+
+  An invalid selector throws `InvalidLabelSelectorError`, naming it and listing these forms. A `*` in a stored label is an `InvalidProjectLabelError` that says wildcards are for filters.
 - Labels are not inherited through the parent chain, and are kept by the soft delete.
 
 ## Config layers

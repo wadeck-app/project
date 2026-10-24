@@ -21,7 +21,7 @@ const ERRORS = [
   'InvalidLabelError', 'LabelTakenError', 'InvalidPathError', 'PathOwnedError', 'MainPathError', 'HasChildrenError',
   'InvalidToolError', 'InvalidIdError', 'AtomicWriteError', 'LockTimeoutError', 'LockLostError', 'RegistryCorruptError',
   'RegistryInvalidError', 'ProjectNotFoundError', 'AmbiguousReferenceError', 'NoProjectInScopeError', 'VirtualProjectError',
-  'DanglingParentError', 'ParentCycleError', 'ConfigSchemaError', 'UnsupportedSchemaVersionError', 'InvalidProjectLabelError', 'ProjectLabelNotFoundError',
+  'DanglingParentError', 'ParentCycleError', 'ConfigSchemaError', 'UnsupportedSchemaVersionError', 'InvalidProjectLabelError', 'InvalidLabelSelectorError', 'ProjectLabelNotFoundError',
 ] as const;
 
 const DETAILS: Record<string, unknown> = {
@@ -32,6 +32,7 @@ const DETAILS: Record<string, unknown> = {
   ProjectNotFoundError: { ref: 'x', suggestions: [] },
   UnsupportedSchemaVersionError: { file: 'f', found: 2, supported: 1 },
   InvalidProjectLabelError: { input: 'x', reason: 'r' },
+  InvalidLabelSelectorError: { input: 'x', reason: 'r' },
   ProjectLabelNotFoundError: { label: 'x', project: { id: '00000001', name: 'a' } },
 };
 

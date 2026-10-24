@@ -8,7 +8,12 @@ export const listCommand: PlainCommand = {
   target: 'none',
   args: [],
   options: {
-    label: { type: 'list', valueName: 'selector', description: "Only the projects that have this label: 'key::value', a key, or a bare value; repeat to require several (AND)" },
+    label: {
+      type: 'list',
+      valueName: 'selector',
+      description:
+        "Only the projects that have this label, repeat to require several (AND). Selectors: key::value, key::* (any label with the key), *::value (any label with the value), *::* (any label), or a bare token (a bare label, or any label with that key); quote wildcards: --label '*::sandbox'",
+    },
   },
   run: (context) => {
     const registry = loadRegistry(context.registryDir);

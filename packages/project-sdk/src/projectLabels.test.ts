@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InvalidProjectLabelError } from './errors.js';
+import { InvalidLabelSelectorError, InvalidProjectLabelError } from './errors.js';
 import { filterProjects, formatLabel, hasLabel, labelsOf, matchesSelectors, normalizeProjectLabel, parseLabel, validateProjectLabels } from './projectLabels.js';
 import { makeProject, makeRegistry } from './testHelpers.js';
 
@@ -87,8 +87,8 @@ describe('selectors', () => {
   });
 
   it('refuses an invalid selector instead of matching nothing', () => {
-    expect(() => hasLabel(project, 'a::b::c')).toThrow(InvalidProjectLabelError);
-    expect(() => matchesSelectors(project, ['ok', ''])).toThrow(InvalidProjectLabelError);
+    expect(() => hasLabel(project, 'a::b::c')).toThrow(InvalidLabelSelectorError);
+    expect(() => matchesSelectors(project, ['ok', ''])).toThrow(InvalidLabelSelectorError);
   });
 
   it('a project of an old registry matches no selector but the empty list', () => {
@@ -126,5 +126,90 @@ describe('validateProjectLabels', () => {
     expect(problem(['Sandbox'])).toThrow(/stored lowercase and trimmed/);
     expect(problem(['a', 'a'])).toThrow(/twice/);
     expect(problem(Array.from({ length: 33 }, (_, i) => `l${i}`))).toThrow(/at most 32/);
+  });
+});
+
+describe('wildcard selectors', () => {
+  // A bare label ("sandbox"), keyed labels, two values for one key.
+  const project = makeProject(1, { labels: ['state::production', 'sandbox', 'owner::alice', 'owner::bob'] });
+  const unlabeled = makeProject(2);
+
+  it.each([
+    ['state::*', true],
+    ['owner::*', true],
+    ['sandbox::*', false],
+    ['missing::*', false],
+    ['*::production', true],
+    ['*::sandbox', true],
+    ['*::alice', true],
+    ['*::missing', false],
+    ['*::*', true],
+    ['STATE::*', true],
+    ['*::Production', true],
+  ])('hasLabel(%s) is %s', (selector, expected) => {
+    expect(hasLabel(project, selector)).toBe(expected);
+  });
+
+  it('key::* only matches keyed labels: a bare label has no key', () => {
+    expect(hasLabel(makeProject(3, { labels: ['state'] }), 'state::*')).toBe(false);
+    expect(hasLabel(makeProject(3, { labels: ['state'] }), 'state')).toBe(true);
+    expect(hasLabel(makeProject(3, { labels: ['state::x'] }), 'state::*')).toBe(true);
+  });
+
+  it('*::value matches a bare label of that value as well as a keyed one', () => {
+    expect(hasLabel(makeProject(4, { labels: ['sandbox'] }), '*::sandbox')).toBe(true);
+    expect(hasLabel(makeProject(4, { labels: ['env::sandbox'] }), '*::sandbox')).toBe(true);
+    expect(hasLabel(makeProject(4, { labels: ['env::sandboxes'] }), '*::sandbox')).toBe(false);
+  });
+
+  it('*::* matches any project with at least one label, never an unlabeled one', () => {
+    expect(hasLabel(unlabeled, '*::*')).toBe(false);
+    expect(hasLabel(makeProject(5, { labels: ['x'] }), '*::*')).toBe(true);
+  });
+
+  it('combines with exact and bare selectors with AND', () => {
+    expect(matchesSelectors(project, ['*::sandbox', 'state::*'])).toBe(true);
+    expect(matchesSelectors(project, ['*::sandbox', 'state::temp'])).toBe(false);
+    expect(matchesSelectors(project, ['*::*', 'owner', 'owner::bob'])).toBe(true);
+    expect(filterProjects(makeRegistry(project, unlabeled), ['*::*']).map((p) => p.id)).toEqual(['00000001']);
+  });
+
+  it.each(['*', '**::a', 'a::**', '*a::b', 'a::b*', '*::*::*', '::*', '*::', 'a*::*', '*::-x', 'a::b c'])('refuses the selector %j, naming it and listing the accepted forms', (selector) => {
+    const run = () => hasLabel(project, selector);
+    expect(run).toThrow(InvalidLabelSelectorError);
+    let message = '';
+    try {
+      run();
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain(`selector '${selector}' is invalid`);
+    for (const form of ['key::value', 'key::*', '*::value', '*::*']) {
+      expect(message).toContain(form);
+    }
+  });
+
+  it('carries the input and the reason', () => {
+    try {
+      hasLabel(project, 'a*::b');
+    } catch (error) {
+      expect(error).toMatchObject({ code: 'INVALID_LABEL_SELECTOR', input: 'a*::b', reason: expect.any(String) });
+      return;
+    }
+    throw new Error('expected an error');
+  });
+
+  it('refuses an invalid selector even when an earlier one already does not match, and on an empty registry', () => {
+    expect(() => matchesSelectors(project, ['missing', 'a**'])).toThrow(InvalidLabelSelectorError);
+    expect(() => filterProjects(makeRegistry(), ['a**'])).toThrow(InvalidLabelSelectorError);
+  });
+});
+
+describe('wildcards are for selectors only', () => {
+  it.each(['*', 'state::*', '*::production', '*::*', 'a*b'])('refuses the stored label %j and says wildcards are for filters', (label) => {
+    const run = () => parseLabel(label);
+    expect(run).toThrow(InvalidProjectLabelError);
+    expect(run).toThrow(/wildcards \(\*\) are only allowed in filter selectors, not in labels/);
+    expect(() => validateProjectLabels(makeProject(1, { labels: [label] }))).toThrow(/invalid label/);
   });
 });

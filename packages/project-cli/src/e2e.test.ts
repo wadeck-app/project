@@ -427,3 +427,44 @@ describe('end-to-end: labels', () => {
     expect((await sandbox.cli(['label', 'add', 'notes', 'back'])).code).toBe(0);
   });
 });
+
+describe('end-to-end: label wildcards in filters', () => {
+  let sandbox: Sandbox;
+
+  beforeAll(async () => {
+    sandbox = makeSandbox();
+    await sandbox.cli(['add', sandbox.dir('shop'), '--label', 'state::production', '--label', 'sandbox']);
+    await sandbox.cli(['add', sandbox.dir('blog'), '--label', 'state::temp', '--label', 'env::sandbox']);
+    await sandbox.cli(['add', sandbox.dir('notes')]);
+  });
+  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+
+  const names = async (...selectors: string[]): Promise<string[]> => {
+    const result = await sandbox.cli(['list', '--json', ...selectors.flatMap((s) => ['--label', s])]);
+    expect(result.code, result.stderr).toBe(0);
+    return (JSON.parse(result.stdout) as { name: string }[]).map((p) => p.name);
+  };
+
+  it('filters with key::*, *::value and *::*, alone and combined', async () => {
+    expect(await names('state::*')).toEqual(['shop', 'blog']);
+    expect(await names('*::sandbox')).toEqual(['shop', 'blog']);
+    expect(await names('*::*')).toEqual(['shop', 'blog']);
+    expect(await names('*::sandbox', 'state::production')).toEqual(['shop']);
+    expect(await names('*::sandbox', 'state::*', 'env::*')).toEqual(['blog']);
+    expect(await names('sandbox::*')).toEqual([]);
+  });
+
+  it('keeps the bare selector as a shorthand', async () => {
+    expect(await names('sandbox')).toEqual(['shop']);
+    expect(await names('state')).toEqual(['shop', 'blog']);
+  });
+
+  it('refuses wildcards in stored labels, and a malformed selector', async () => {
+    const stored = await sandbox.cli(['label', 'add', 'shop', 'state::*']);
+    expect(stored.code).toBe(1);
+    expect(stored.stderr).toContain('wildcards (*) are only allowed in filter selectors, not in labels');
+    const selector = await sandbox.cli(['list', '--label', '**::x']);
+    expect(selector.code).toBe(1);
+    expect(selector.stderr).toContain("selector '**::x' is invalid");
+  });
+});

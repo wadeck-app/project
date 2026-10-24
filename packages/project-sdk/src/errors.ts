@@ -209,3 +209,15 @@ export class ProjectLabelNotFoundError extends ProjectError {
     this.project = details.project;
   }
 }
+
+export class InvalidLabelSelectorError extends ProjectError {
+  /** The selector as it was given. */
+  readonly input: string;
+  readonly reason: string;
+
+  constructor(message: string, details: { input: string; reason: string }) {
+    super('INVALID_LABEL_SELECTOR', message);
+    this.input = details.input;
+    this.reason = details.reason;
+  }
+}

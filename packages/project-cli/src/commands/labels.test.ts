@@ -129,8 +129,9 @@ describe('project labels', () => {
     it('fails on an invalid selector', async () => {
       const result = await h.cli(['list', '--label', 'a::b::c']);
       expect(result.code).toBe(1);
-      expect(result.err).toContain("label 'a::b::c' is invalid");
+      expect(result.err).toContain("selector 'a::b::c' is invalid");
     });
+it('filters with wildcards: key::*, *::value, *::*, combined with AND', async () => {      await h.cli(['add', h.dir('d'), '--label', 'env::sandbox']);      expect(await names('state::*')).toEqual(['a', 'b']);      expect(await names('*::sandbox')).toEqual(['a', 'd']);      expect(await names('*::sandbox', 'state::*')).toEqual(['a']);      expect(await names('*::*')).toEqual(['a', 'b', 'd']);      expect(await names('sandbox::*')).toEqual([]);    });    it('refuses a wildcard in a stored label, saying wildcards are for filters', async () => {      const result = await h.cli(['label', 'add', 'a', 'state::*']);      expect(result.code).toBe(1);      expect(result.err).toContain('wildcards (*) are only allowed in filter selectors, not in labels');      const added = await h.cli(['add', h.dir('e'), '--label', '*::x']);      expect(added.err).toContain('wildcards (*) are only allowed in filter selectors');    });    it('refuses a malformed wildcard selector, listing the accepted forms', async () => {      const result = await h.cli(['list', '--label', 'a*::b']);      expect(result.code).toBe(1);      expect(result.err).toContain("selector 'a*::b' is invalid");      expect(result.err).toContain('key::*');    });    it('lists the selector forms and the quoting advice in the help of --label', async () => {      const help = (await h.cli(['list', '--help'])).out;      expect(help).toContain('key::value');      expect(help).toContain('*::value');      expect(help).toContain('*::*');      expect(help).toContain("quote wildcards: --label '*::sandbox'");    });
 
     it('says when no project matches, rather than printing an empty table', async () => {
       const result = await h.cli(['list', '--label', 'nothing']);
