@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { devBuildRefusalMessage } from '@wadeck-app/shared-cli/ReleaseVersion';
 import { type Harness, makeHarness } from '../testHelpers.js';
 
 const meta = vi.hoisted(() => ({
@@ -146,9 +147,7 @@ describe('project cli update / rollback in a development build', () => {
   it.each(['update', 'rollback'])('cli %s refuses, exit 1, and touches nothing', async (command) => {
     const result = await h.cli(['cli', command]);
     expect(result.code).toBe(1);
-    expect(result.err).toContain('error: this is a development build (version');
-    expect(result.err).toContain(`'project cli ${command}' would replace the global install`);
-    expect(result.err).toContain('npm i -g @wadeck-app/project-cli');
+expect(result.err).toContain(`error: ${devBuildRefusalMessage('project', '0.0.1')}`);    expect(result.err).toContain('dev build 0.0.1: refusing to update the global install of project');
     expect(meta.cliUpdateCommand).not.toHaveBeenCalled();
     expect(meta.cliRollbackCommand).not.toHaveBeenCalled();
   });

@@ -8,6 +8,12 @@ export interface ConfigSection {
   scope: ConfigScope;
   /** Only for scope 'inherit'. Default 'deep' (child wins, arrays replaced). 'append' concatenates arrays parent-then-child. */
   merge?: MergeStrategy;
+  /**
+   * Declares the keys allowed inside this section (ONE nested level, e.g. `plugins.github`): any other key is refused by validateLayer,
+   * naming its dotted path, and the section must then be a mapping. Their `scope` follows the same rules as for a section; their content is
+   * not validated and `merge` is not used (the section's strategy merges them). Without `fields` the content of a section is free.
+   */
+  fields?: Record<string, { scope: ConfigScope }>;
 }
 
 export interface ConfigSchema {
@@ -34,21 +40,50 @@ function isPlainObject(value: unknown): value is PlainObject {
 function sectionOf(schema: ConfigSchema, layerName: string, key: string): ConfigSection {
   if (key === '__proto__' || !Object.hasOwn(schema.sections, key)) {
     const declared = Object.keys(schema.sections).sort().join(', ');
-    throw new ConfigSchemaError(`layer '${layerName}': key '${key}' is not declared in the config schema (declared keys: ${declared}); remove or rename it`);
+    throw new ConfigSchemaError(`layer '${layerName}': key '${key}' is not declared in the config schema (declared keys: ${declared}); remove or rename it`, { layer: layerName, key });
   }
   return schema.sections[key]!;
 }
 
-/** Checks the top-level keys of one config layer against the schema. Nothing is ignored silently. */
+/** Refuses a global-only entry in a project layer and a project-only one in the global layer. `shown` is the dotted path as the user wrote it. */
+function checkScope(layerName: string, key: string, shown: string, scope: ConfigScope, level: 'global' | 'project'): void {
+  const details = { layer: layerName, key, ...(shown === key ? {} : { path: shown }) };
+  if (scope === 'global' && level === 'project') {
+    throw new ConfigSchemaError(`layer '${layerName}': key '${shown}' is global-only and has no effect in a project config; move it to the global config`, details);
+  }
+  if (scope === 'local' && level === 'global') {
+    throw new ConfigSchemaError(`layer '${layerName}': key '${shown}' is project-only and cannot be set in the global config; move it to a project config`, details);
+  }
+}
+
+/** One nested level: the keys of a section that declares `fields` must be declared too, with the same scope rules. */
+function validateFields(layerName: string, key: string, section: ConfigSection, value: unknown, level: 'global' | 'project'): void {
+  const fields = section.fields;
+  if (fields === undefined) {
+    return;
+  }
+  const declared = Object.keys(fields).sort().map((name) => `${key}.${name}`);
+  if (!isPlainObject(value)) {
+    throw new ConfigSchemaError(`layer '${layerName}': key '${key}' must be a mapping of its declared keys (${declared.join(', ')})`, { layer: layerName, key });
+  }
+  for (const name of Object.keys(value)) {
+    const path = `${key}.${name}`;
+    if (name === '__proto__' || !Object.hasOwn(fields, name)) {
+      throw new ConfigSchemaError(
+        `layer '${layerName}': key '${path}' is not declared in the config schema (declared keys: ${declared.join(', ')}); remove or rename it`,
+        { layer: layerName, key, path },
+      );
+    }
+    checkScope(layerName, key, path, fields[name]!.scope, level);
+  }
+}
+
+/** Checks the top-level keys of one config layer against the schema, and the nested keys of the sections that declare `fields`. Nothing is ignored silently. */
 export function validateLayer(schema: ConfigSchema, layerName: string, layer: Record<string, unknown>, level: 'global' | 'project'): void {
   for (const key of Object.keys(layer)) {
     const section = sectionOf(schema, layerName, key);
-    if (section.scope === 'global' && level === 'project') {
-      throw new ConfigSchemaError(`layer '${layerName}': key '${key}' is global-only and has no effect in a project config; move it to the global config`);
-    }
-    if (section.scope === 'local' && level === 'global') {
-      throw new ConfigSchemaError(`layer '${layerName}': key '${key}' is project-only and cannot be set in the global config; move it to a project config`);
-    }
+    checkScope(layerName, key, key, section.scope, level);
+    validateFields(layerName, key, section, layer[key], level);
   }
 }
 
@@ -68,7 +103,7 @@ function deepMerge(base: unknown, override: unknown, where: string): unknown {
 
 function append(base: unknown, override: unknown, layerName: string, key: string): unknown[] {
   if (!Array.isArray(override) || (base !== undefined && !Array.isArray(base))) {
-    throw new ConfigSchemaError(`layer '${layerName}': key '${key}' is merged with 'append' so its value must be an array in every layer`);
+    throw new ConfigSchemaError(`layer '${layerName}': key '${key}' is merged with 'append' so its value must be an array in every layer`, { layer: layerName, key });
   }
   return [...(structuredClone(base) ?? []), ...structuredClone(override)];
 }

@@ -5,7 +5,7 @@ import { InvalidIdError, InvalidToolError } from './errors.js';
 import { isIdLike } from './ids.js';
 import type { Project, Registry } from './types.js';
 
-export type ToolDirKind = 'config' | 'data';
+export type ToolDirKind = 'config' | 'data' | 'cache' | 'logs';
 
 export interface ConfigLayer {
   project: Project;
@@ -13,6 +13,7 @@ export interface ConfigLayer {
   dir: string;
 }
 
+const TOOL_DIR_KINDS: readonly ToolDirKind[] = ['config', 'data', 'cache', 'logs'];
 const TOOL_PATTERN = /^[a-z][a-z0-9-]*$/;
 
 /** `<registryDir>/projects/<id>`: the folder of one project, parent of every tool folder. Built from the immutable id only, never from a name. */
@@ -31,8 +32,8 @@ export function projectToolDir(registryDir: string, projectId: string, tool: str
   if (!TOOL_PATTERN.test(tool)) {
     throw new InvalidToolError(`tool name '${tool}' is invalid: it must match ^[a-z][a-z0-9-]*$ (for example 'task', 'flow', 'queue')`);
   }
-  if (kind !== 'config' && kind !== 'data') {
-    throw new InvalidToolError(`directory kind '${String(kind)}' is invalid: expected 'config' or 'data'`);
+  if (!TOOL_DIR_KINDS.includes(kind)) {
+    throw new InvalidToolError(`directory kind '${String(kind)}' is invalid: expected 'config', 'data', 'cache' or 'logs'`);
   }
   const dir = join(base, tool, kind);
   if (options.ensure === true) {

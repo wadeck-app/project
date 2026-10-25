@@ -1,3 +1,4 @@
+import { devBuildRefusalMessage } from '@wadeck-app/shared-cli/ReleaseVersion';
 import { describe, expect, it, vi } from 'vitest';
 import { type UpdaterDeps, runProjectUpdater } from './runProjectUpdater.js';
 
@@ -81,7 +82,7 @@ describe('runProjectUpdater in a development build', () => {
     const code = await runProjectUpdater(deps);
     expect(code).toBe(1);
     expect(deps.runUpdater).not.toHaveBeenCalled();
-    expect(err.join('\n')).toMatch(/\[project-updater\] fatal: .*development build \(version 0\.0\.0-local/);
+    expect(err.join('\n')).toBe(`[project-updater] ${devBuildRefusalMessage('project', '0.0.0-local')}`);
     expect(writtenStates).toEqual([]);
   });
 });

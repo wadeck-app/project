@@ -1,14 +1,22 @@
 import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { runSelfCheck } from '@wadeck-app/shared-cli';
+import { devBuildRefusalMessage, isReleaseVersion } from '@wadeck-app/shared-cli/ReleaseVersion';
 import { readChannelFromConfig } from '@wadeck-app/shared-cli/ChannelConfig';
 import { cliLogsCommand, cliRollbackCommand, cliUpdateCommand, cliVersionCommand } from '@wadeck-app/shared-cli/CliMetaCommands';
 import type { CommandOutput, PlainCommand } from '../command.js';
-import { assertReleaseBuild } from '../devBuild.js';
 import { CliError } from '../errors.js';
 import { PACKAGE_NAME, UPDATER_BUNDLE_NAME, ownBundlePath } from '../ownBundle.js';
 import { selfChecks } from '../selfChecks.js';
 import { currentVersion } from '../version.js';
+
+/** A repo-built CLI (a version CI did not stamp) must never replace or roll back the global install. */
+function refuseDevBuild(): void {
+  const version = currentVersion();
+  if (!isReleaseVersion(version)) {
+    throw new CliError(devBuildRefusalMessage('project', version));
+  }
+}
 
 /** These commands write their own output (shared-cli): there is no result to print, in JSON mode neither. */
 const PRINTED_BY_THE_COMMAND: CommandOutput = { json: undefined, lines: [] };
@@ -43,7 +51,7 @@ const updateCommand: PlainCommand = {
       await cliVersionCommand(PACKAGE_NAME, currentVersion(), readChannelFromConfig(context.registryDir));
       return PRINTED_BY_THE_COMMAND;
     }
-    assertReleaseBuild(currentVersion(), 'update');
+    refuseDevBuild();
     const updater = join(dirname(ownBundlePath()), UPDATER_BUNDLE_NAME);
     if (!existsSync(updater)) {
       throw new CliError(`updater bundle not found: ${updater} (a development build has none; build it with: npm run bundle)`);
@@ -64,7 +72,7 @@ const rollbackCommand: PlainCommand = {
   args: [],
   options: {},
   run: async (context) => {
-    assertReleaseBuild(currentVersion(), 'rollback');
+    refuseDevBuild();
     await cliRollbackCommand(PACKAGE_NAME, context.registryDir);
     return PRINTED_BY_THE_COMMAND;
   },

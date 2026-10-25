@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { defaultRegistryDir } from '@wadeck-app/project-sdk';
 import { UpdateManager } from '@wadeck-app/shared-cli';
-import { scheduleBackgroundUpdate } from './devBuild.js';
 import { showUpdateNotice } from './noticeGlue.js';
 import { PACKAGE_NAME, UPDATER_BUNDLE_NAME, ownBundlePath } from './ownBundle.js';
 import { run } from './run.js';
@@ -29,7 +28,7 @@ async function main(): Promise<void> {
     process.cwd(),
   );
   // After every command, a detached background run looks for a newer version (never for a development build, and a no-op in a build without updater bundle).
-  scheduleBackgroundUpdate({ version: currentVersion(), manager: updates, bundlePath: ownBundlePath(), updaterName: UPDATER_BUNDLE_NAME });
+  updates.scheduleBackgroundUpdate(ownBundlePath(), UPDATER_BUNDLE_NAME, currentVersion());
 }
 
 void main();

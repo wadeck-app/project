@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defaultRegistryDir, normalizePath, toNativePath } from '@wadeck-app/project-sdk';
@@ -65,19 +65,27 @@ export function isolatedCliEnv(root: string): NodeJS.ProcessEnv {
     USERPROFILE: join(root, 'home'),
     npm_config_prefix: join(root, 'npm-prefix'),
     npm_config_registry: 'http://127.0.0.1:9/',
+    // A scoped registry in the real .npmrc beats the plain one for @wadeck-app packages: pin the scope too.
+    'npm_config_@wadeck-app:registry': 'http://127.0.0.1:9/',
   };
 }
 
-/** Size and mtime of what an update or a rollback would write in the REAL environment: the global install of the CLI and the real update files. Read-only. */
-export function realStateSnapshot(): Record<string, string> {
-  const describe = (file: string): string => (existsSync(file) ? `${statSync(file).size}:${statSync(file).mtimeMs}` : 'missing');
+/** Size and mtime of the REAL global install of the CLI (what an update or a rollback would replace). Read-only; `missing` when it is not installed. */
+export function realGlobalInstallSnapshot(): string {
   const globalRoot = execSync('npm root -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const file = join(globalRoot, '@wadeck-app', 'project-cli', 'package.json');
+  return existsSync(file) ? `${statSync(file).size}:${statSync(file).mtimeMs}` : 'missing';
+}
+
+/**
+ * Whether the REAL log of the CLI (today and yesterday, UTC) mentions the token. A process that logged an argument carrying a unique token
+ * used the real config folder; real sessions using the CLI at the same time cannot produce the token, which makes this free of races.
+ */
+export function realLogMentions(token: string): boolean {
   const configDir = defaultRegistryDir(process.env);
-  return {
-    'global package.json': describe(join(globalRoot, '@wadeck-app', 'project-cli', 'package.json')),
-    'update-state.json': describe(join(configDir, 'update-state.json')),
-    'update-cache.json': describe(join(configDir, 'update-cache.json')),
-    'update-notice-shown.json': describe(join(configDir, 'update-notice-shown.json')),
-    'update.lock': describe(join(configDir, 'update.lock')),
-  };
+  return [0, 1].some((daysAgo) => {
+    const day = new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10);
+    const file = join(configDir, 'logs', `${day}.ndjson`);
+    return existsSync(file) && readFileSync(file, 'utf8').includes(token);
+  });
 }

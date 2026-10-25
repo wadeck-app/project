@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { isolatedCliEnv, realStateSnapshot } from './testHelpers.js';
+import { isolatedCliEnv, realGlobalInstallSnapshot, realLogMentions } from './testHelpers.js';
 
 const entry = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'main.js');
 
@@ -34,28 +35,49 @@ describe('isolatedCliEnv', () => {
 
 // The incident this guards against: an updater killed inside `npm install -g` removed the real global CLI.
 describe('the commands that update or roll back never touch the real installation or the real config folder', () => {
-  it('cli update and cli rollback of a development build refuse, leaving the real global install and the real update files as they were', () => {
+  let root: string;
+
+  beforeEach(() => {
     if (!existsSync(entry)) {
       throw new Error(`${entry} is missing: run 'npm run build' before 'npm test'`);
     }
+    root = mkdtempSync(join(tmpdir(), 'project-cli-isolated-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  const cli = (...args: string[]) => spawnSync(process.execPath, [entry, ...args], { env: isolatedCliEnv(root), encoding: 'utf8' });
+
+  it('cli update and cli rollback of a development build refuse, leaving the real global install as it was', () => {
+    const before = realGlobalInstallSnapshot();
+    for (const command of ['update', 'rollback']) {
+      const result = cli('cli', command);
+      expect(result.status, result.stderr).toBe(1);
+      expect(result.stderr).toContain('dev build');
+    }
+    expect(realGlobalInstallSnapshot()).toEqual(before);
+  });
+
+  // Real sessions use the installed CLI while the tests run, so the real files cannot be compared before and after: a unique argument is logged instead.
+  it('what a spawned CLI logs lands in the isolated config folder, never in the real one', () => {
+    const token = `isolation-probe-${randomUUID()}`;
+    const result = cli('list', `--${token}`);
+    expect(result.status).toBe(2);
+    expect(readFileSync(join(root, 'xdg', 'project', 'logs', `${new Date().toISOString().slice(0, 10)}.ndjson`), 'utf8')).toContain(token);
+    expect(realLogMentions(token)).toBe(false);
+  });
+
+  it('the probe would notice a leak: a token logged in the real config folder is found', () => {
+    expect(realLogMentions(`never-logged-${randomUUID()}`)).toBe(false);
+  });
+});
+describe('isolatedCliEnv and the scoped registry', () => {
+  it('also points the @wadeck-app scope at the unreachable registry: a scoped setting in the real .npmrc must not win', () => {
     const root = mkdtempSync(join(tmpdir(), 'project-cli-isolated-'));
     try {
-      const before = realStateSnapshot();
-      for (const command of ['update', 'rollback']) {
-        const result = spawnSync(process.execPath, [entry, 'cli', command], { env: isolatedCliEnv(root), encoding: 'utf8' });
-        expect(result.status, result.stderr).toBe(1);
-        expect(result.stderr).toContain('development build');
-      }
-      expect(realStateSnapshot()).toEqual(before);
+      const env = isolatedCliEnv(root);
+      expect(env['npm_config_@wadeck-app:registry']).toBe(env['npm_config_registry']);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  });
-
-  it('the snapshot covers the global install of the CLI and the update files of the real config folder', () => {
-    const snapshot = realStateSnapshot();
-    expect(Object.keys(snapshot)).toEqual(
-      expect.arrayContaining(['global package.json', 'update-state.json', 'update-cache.json', 'update-notice-shown.json', 'update.lock']),
-    );
   });
 });

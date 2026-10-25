@@ -16,6 +16,8 @@ export {
   parseLabel,
 } from './projectLabels.js';
 export { MAX_PROJECT_LABELS } from './projectLabels.js';
+export { type ProjectOption, extractProjectOption, resolveProjectFromArgs } from './projectOption.js';
+export { findProjectIncludingDeleted } from './deletedLookup.js';
 export { addLabels, removeLabels } from './labelMutations.js';
 export { assertDirectory, isSameOrInside, normalizePath, pathKey, toNativePath } from './paths.js';
 

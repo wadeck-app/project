@@ -468,3 +468,44 @@ describe('end-to-end: label wildcards in filters', () => {
     expect(selector.stderr).toContain("selector '**::x' is invalid");
   });
 });
+
+describe('end-to-end: a development build never starts the background update', () => {
+  let root: string;
+  let marker: string;
+
+  beforeAll(() => {
+    root = mkdtempSync(join(tmpdir(), 'project-cli-bgupdate-'));
+    marker = join(root, 'updater-ran.txt');
+    // A stand-in for project-updater.cjs, next to a stand-in for project.cjs (the launcher tells the CLI where its bundle is).
+    writeFileSync(join(root, 'project-updater.cjs'), `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran');\n`);
+  });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  const waitForMarker = async (): Promise<boolean> => {
+    for (let i = 0; i < 40; i++) {
+      if (existsSync(marker)) {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return false;
+  };
+
+  it('control: the same stand-in updater is started for a release version', async () => {
+    const { UpdateManager } = await import('@wadeck-app/shared-cli');
+    new UpdateManager('@wadeck-app/project-cli', join(root, 'cfg')).scheduleBackgroundUpdate(join(root, 'project.cjs'), 'project-updater.cjs', '2026.10.25-042-50a5bcb8');
+    expect(await waitForMarker()).toBe(true);
+    rmSync(marker);
+  });
+
+  it('dist/main.js (version from package.json, not a release) does not start it after a command', async () => {
+    const sandbox = makeSandbox();
+    try {
+      const result = await sandbox.cli(['list'], undefined, { LAUNCHER_BUNDLE_OVERRIDE: join(root, 'project.cjs') });
+      expect(result.code, result.stderr).toBe(0);
+      expect(await waitForMarker()).toBe(false);
+    } finally {
+      rmSync(sandbox.root, { recursive: true, force: true });
+    }
+  });
+});

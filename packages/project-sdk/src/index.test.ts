@@ -8,7 +8,7 @@ import * as sdk from './index.js';
 const here = dirname(fileURLToPath(import.meta.url));
 
 const FUNCTIONS = [
-  'defaultRegistryDir', 'projectDir', 'mainPath', 'isVirtual', 'describeProject', 'deriveName', 'parseLabel', 'formatLabel', 'normalizeProjectLabel', 'labelsOf', 'hasLabel', 'matchesSelectors', 'filterProjects', 'addLabels', 'removeLabels', 'generateId', 'isIdLike', 'normalizeLabel', 'normalizePath', 'toNativePath', 'pathKey', 'isSameOrInside', 'assertDirectory',
+  'defaultRegistryDir', 'projectDir', 'findProjectIncludingDeleted', 'extractProjectOption', 'resolveProjectFromArgs', 'mainPath', 'isVirtual', 'describeProject', 'deriveName', 'parseLabel', 'formatLabel', 'normalizeProjectLabel', 'labelsOf', 'hasLabel', 'matchesSelectors', 'filterProjects', 'addLabels', 'removeLabels', 'generateId', 'isIdLike', 'normalizeLabel', 'normalizePath', 'toNativePath', 'pathKey', 'isSameOrInside', 'assertDirectory',
   'writeFileAtomic', 'withRegistryLock', 'lockFilePath',
   'loadRegistry', 'loadDeleted', 'registryFilePath', 'deletedFilePath', 'validateRegistry',
   'addProject', 'renameProject', 'addAlias', 'removeAlias', 'setParent', 'setGit', 'removeProject',
@@ -21,7 +21,7 @@ const ERRORS = [
   'InvalidLabelError', 'LabelTakenError', 'InvalidPathError', 'PathOwnedError', 'MainPathError', 'HasChildrenError',
   'InvalidToolError', 'InvalidIdError', 'AtomicWriteError', 'LockTimeoutError', 'LockLostError', 'RegistryCorruptError',
   'RegistryInvalidError', 'ProjectNotFoundError', 'AmbiguousReferenceError', 'NoProjectInScopeError', 'VirtualProjectError',
-  'DanglingParentError', 'ParentCycleError', 'ConfigSchemaError', 'UnsupportedSchemaVersionError', 'InvalidProjectLabelError', 'InvalidLabelSelectorError', 'ProjectLabelNotFoundError',
+  'DanglingParentError', 'ParentCycleError', 'ConfigSchemaError', 'UnsupportedSchemaVersionError', 'InvalidProjectLabelError', 'InvalidLabelSelectorError', 'ProjectLabelNotFoundError', 'ProjectOptionError',
 ] as const;
 
 const DETAILS: Record<string, unknown> = {
@@ -33,6 +33,7 @@ const DETAILS: Record<string, unknown> = {
   UnsupportedSchemaVersionError: { file: 'f', found: 2, supported: 1 },
   InvalidProjectLabelError: { input: 'x', reason: 'r' },
   InvalidLabelSelectorError: { input: 'x', reason: 'r' },
+  ProjectOptionError: { kind: 'repeated', option: '-p' },
   ProjectLabelNotFoundError: { label: 'x', project: { id: '00000001', name: 'a' } },
 };
 

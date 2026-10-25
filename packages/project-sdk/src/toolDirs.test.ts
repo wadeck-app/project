@@ -56,7 +56,7 @@ describe('projectToolDir', () => {
   });
 
   it('refuses an unknown kind', () => {
-    expect(() => projectToolDir(dir, '3fa9c1d2', 'task', 'cache' as 'config')).toThrow(/'config' or 'data'/);
+    expect(() => projectToolDir(dir, '3fa9c1d2', 'task', 'bogus' as 'config')).toThrow(/'config', 'data', 'cache' or 'logs'/);
   });
 });
 
@@ -100,5 +100,21 @@ describe('projectDir', () => {
 
   it('refuses anything that is not a project id', () => {
     expect(() => projectDir('reg', '../escape')).toThrow(InvalidIdError);
+  });
+});
+
+describe('projectToolDir kinds', () => {
+  it.each(['config', 'data', 'cache', 'logs'] as const)('has the layout <registryDir>/projects/<id>/<tool>/%s', (kind) => {
+    expect(projectToolDir('reg', '3fa9c1d2', 'task', kind)).toBe(join('reg', 'projects', '3fa9c1d2', 'task', kind));
+  });
+
+  it('creates the cache and logs folders with ensure', () => {
+    const root = mkdtempSync(join(tmpdir(), 'project-sdk-kinds-'));
+    try {
+      expect(existsSync(projectToolDir(root, '3fa9c1d2', 'flow', 'cache', { ensure: true }))).toBe(true);
+      expect(existsSync(projectToolDir(root, '3fa9c1d2', 'flow', 'logs', { ensure: true }))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

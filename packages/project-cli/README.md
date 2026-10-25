@@ -23,7 +23,7 @@ The notice of a successful update is shown once (`update-notice-shown.json` reme
 
 An update is journalled before `npm install -g` runs (`status: applying` in the update state); if the updater is killed in the middle, the next updater run repairs the install, and the next command says `An update to vX was interrupted (previous version vY). Repair it with: project cli update`.
 
-Only a stamped release (`YYYY.M.D-NNN-<8 hex>`) updates itself. A repo-built or locally bundled CLI never schedules the background update, and `project cli update` / `project cli rollback` refuse with a clear error: they would replace the real global install.
+Only a release stamped by CI (CalVer, checked by `isReleaseVersion` of `@wadeck-app/shared-cli/ReleaseVersion`) updates itself. A repo-built or locally bundled CLI never starts the background update (the version is passed to `UpdateManager.scheduleBackgroundUpdate`), and `project cli update`, `project cli rollback` and the updater itself refuse with the shared `dev build ...: refusing to update the global install of project` message: they would replace the real global install.
 
 | Command | What it does |
 |---|---|

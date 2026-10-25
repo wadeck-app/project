@@ -162,8 +162,18 @@ export class ParentCycleError extends ProjectError {
 }
 
 export class ConfigSchemaError extends ProjectError {
-  constructor(message: string) {
+  /** Name of the config layer the problem is in. */
+  readonly layer: string | undefined;
+  /** The top-level key. */
+  readonly key: string | undefined;
+  /** The full dotted path (`plugins.github`) when the problem is in a nested key. */
+  readonly path: string | undefined;
+
+  constructor(message: string, details: { layer?: string; key?: string; path?: string } = {}) {
     super('CONFIG_SCHEMA', message);
+    this.layer = details.layer;
+    this.key = details.key;
+    this.path = details.path;
   }
 }
 
@@ -219,5 +229,18 @@ export class InvalidLabelSelectorError extends ProjectError {
     super('INVALID_LABEL_SELECTOR', message);
     this.input = details.input;
     this.reason = details.reason;
+  }
+}
+
+export class ProjectOptionError extends ProjectError {
+  /** `missing-value`: the flag is the last argument or is followed by another flag. `repeated`: the flag is given more than once. */
+  readonly kind: 'missing-value' | 'repeated';
+  /** The flag as it was typed (`-p`, `--project`, `--project=x`). */
+  readonly option: string;
+
+  constructor(message: string, details: { kind: 'missing-value' | 'repeated'; option: string }) {
+    super('INVALID_PROJECT_OPTION', message);
+    this.kind = details.kind;
+    this.option = details.option;
   }
 }

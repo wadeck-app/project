@@ -35,8 +35,10 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
 | Labels | `addLabels(registryDir, ref, labels)`, `removeLabels(registryDir, ref, labels)`, `parseLabel`, `formatLabel`, `normalizeProjectLabel`, `labelsOf(project)`, `hasLabel(project, selector)`, `matchesSelectors(project, selectors)`, `filterProjects(registry, selectors)` |
 | Projects | `addProject` (`labels?`), `renameProject`, `addAlias`, `removeAlias`, `setParent`, `setGit`, `removeProject(registryDir, ref, { recursive })` |
 | Paths | `addPath(.., { main })`, `removePath(.., { newMain })`, `movePath`, `setMain` |
+| Options | `extractProjectOption(argv, env, envName)`, `resolveProjectFromArgs(registry, argv, env, envName, cwd)` |
+| Lookup | `findProjectIncludingDeleted(registryDir, id)` |
 | Resolution | `resolveReference`, `findProjectForPath`, `resolveScope` (flag > env > cwd; `label` names the source of an explicit reference), `describeResolution`, `requirePath` |
-| Inheritance | `getChain`, `getConfigLayers`, `projectToolDir(registryDir, id, tool, 'config' or 'data', { ensure })` |
+| Inheritance | `getChain`, `getConfigLayers`, `projectToolDir(registryDir, id, tool, kind, { ensure })` with kind `config`, `data`, `cache` or `logs` (`<registryDir>/projects/<id>/<tool>/<kind>`) |
 | Config helpers | `validateLayer`, `mergeLayers(schema, layers)`, root-first with the project's own layer last; `ConfigSchema` scopes `global`, `local`, `inherit`; merges `replace`, `deep`, `append`; the CLIs parse the files |
 | Infra | `withRegistryLock`, `writeFileAtomic`, `lockFilePath` |
 | Helpers | `toNativePath(path, platform?)`, `normalizePath(path, base?)`, `pathKey(path, base?)`, `isSameOrInside`, `assertDirectory`, `generateId`, `isIdLike`, `normalizeLabel`, `deriveName(path)`, `describeProject(project)`, `mainPath(project)`, `isVirtual(project)`, `levenshtein` |
@@ -93,9 +95,18 @@ Free meta information on a project (`state::production`, `sandbox`): a set of st
   An invalid selector throws `InvalidLabelSelectorError`, naming it and listing these forms. A `*` in a stored label is an `InvalidProjectLabelError` that says wildcards are for filters.
 - Labels are not inherited through the parent chain, and are kept by the soft delete.
 
+## Routing a path or a flag to a project
+
+- A path: `findProjectForPath(registry, cwd)?.project.id` is the way to route a folder to a project (the deepest registered path that contains it wins).
+- A git worktree that lies outside every registered path is NOT recognised: add it with `project paths add <ref> <worktree-path>` (the CLIs fail with `NoProjectInScopeError` until then).
+- The flag: `extractProjectOption(argv, env, envName)` takes `-p <ref>`, `--project <ref>` or `--project=<ref>` out of the arguments wherever it is (nothing after `--` is read) and reads the environment variable (blank = unset). A flag without value (last, or followed by another flag) and a repeated flag throw `ProjectOptionError` (`kind`, `option`). `resolveProjectFromArgs` adds `resolveScope` (flag, then variable, then cwd) and returns `{ scope, args }`.
+- An id kept in a tool's records: `findProjectIncludingDeleted(registryDir, id)` finds the project by exact id, live first, then in `deleted_projects.json` (`{ project, deleted, deletedAt? }`), so the id of a removed project still resolves.
+
 ## Config layers
 
 `mergeLayers` takes layers root-first (global, ancestors, the project's own last). A `local` key is read from the last layer only: the same key in an ancestor is valid there but ignored for the merge, and a project that does not set it has no value. `origins` names the layer of each effective value.
+
+A section may declare `fields` (one nested level, e.g. `plugins.github`): `validateLayer` then refuses any other nested key, naming its dotted path (`key 'plugins.gitlab' is not declared ...`), with the same global-only / project-only rules. `ConfigSchemaError` carries `layer`, `key` and, for a nested key, `path`.
 
 ## Locking and tool data
 

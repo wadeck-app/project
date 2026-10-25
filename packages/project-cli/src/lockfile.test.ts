@@ -60,3 +60,14 @@ describe('package-lock.json', () => {
     ).toBe(true);
   });
 });
+
+describe('package-lock.json and the dev-build guard', () => {
+  it('pins a shared-cli with the ReleaseVersion guard that accepts npm-style CalVer (2026.10.25-044 or later)', () => {
+    const locked = lockedVersion('@wadeck-app/shared-cli');
+    expect(
+      isAtLeast(locked, '2026.10.25-044-51609e11'),
+      `package-lock.json pins @wadeck-app/shared-cli ${locked}: older versions have no ReleaseVersion guard (a repo-built CLI could start the updater and replace the real global install) or reject unpadded month/day versions. ` +
+        'Refresh it with: npm update @wadeck-app/shared-cli, and commit package-lock.json',
+    ).toBe(true);
+  });
+});
