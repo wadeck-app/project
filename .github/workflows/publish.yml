@@ -104,7 +104,12 @@ jobs:
 
             # What gets published must run and know its version, or the auto-update of the installed CLIs would loop on it
             - name: Verify the generated bundle prints the stamped version
+              # The stamped bundle schedules a background update after each command: keep it away from the real config folder and switch it off
+              env:
+                  XDG_CONFIG_HOME: ${{ runner.temp }}/project-cli-check
               run: |
+                  mkdir -p "$XDG_CONFIG_HOME/project"
+                  echo "autoUpdate: false" > "$XDG_CONFIG_HOME/project/config.yml"
                   expected="${{ steps.version.outputs.version }}"
                   actual="$(node packages/project-cli-dist/project.cjs --version)"
                   if [ "$actual" != "$expected" ]; then

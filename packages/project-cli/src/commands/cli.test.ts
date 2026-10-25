@@ -26,10 +26,13 @@ describe('project cli ...', () => {
     bundleDir = mkdtempSync(join(tmpdir(), 'project-cli-bundle-'));
     // The launcher tells the CLI where its own bundle is; the updater sits next to it.
     vi.stubEnv('LAUNCHER_BUNDLE_OVERRIDE', join(bundleDir, 'project.cjs'));
+    // These commands only run on a stamped release (see the development build guard below).
+    vi.stubGlobal('__PROJECT_CLI_VERSION__', '2026.10.25-019-97c1ee11');
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
     rmSync(bundleDir, { recursive: true, force: true });
     h.cleanup();
@@ -126,5 +129,33 @@ describe('project cli update --log', () => {
     const result = await h.cli(['cli', 'update', '--help']);
     expect(result.out).toContain('--check');
     expect(result.out).toContain('--log');
+  });
+});
+
+describe('project cli update / rollback in a development build', () => {
+  let h: Harness;
+
+  beforeEach(() => {
+    h = makeHarness();
+  });
+  afterEach(() => {
+    vi.clearAllMocks();
+    h.cleanup();
+  });
+
+  it.each(['update', 'rollback'])('cli %s refuses, exit 1, and touches nothing', async (command) => {
+    const result = await h.cli(['cli', command]);
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('error: this is a development build (version');
+    expect(result.err).toContain(`'project cli ${command}' would replace the global install`);
+    expect(result.err).toContain('npm i -g @wadeck-app/project-cli');
+    expect(meta.cliUpdateCommand).not.toHaveBeenCalled();
+    expect(meta.cliRollbackCommand).not.toHaveBeenCalled();
+  });
+
+  it('the read-only commands still work: version, update --check, update --log, logs, self-check', async () => {
+    for (const argv of [['cli', 'version'], ['cli', 'update', '--check'], ['cli', 'update', '--log'], ['cli', 'logs']]) {
+      expect((await h.cli(argv)).code, argv.join(' ')).toBe(0);
+    }
   });
 });

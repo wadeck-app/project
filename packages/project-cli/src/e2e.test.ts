@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type Project, loadDeleted, loadRegistry, normalizePath, toNativePath, validateRegistry } from '@wadeck-app/project-sdk';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { isolatedCliEnv } from './testHelpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const entry = join(here, '..', 'dist', 'main.js');
@@ -33,8 +34,7 @@ function makeSandbox(): Sandbox {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'project-cli-e2e-')));
   const work = join(root, 'work');
   mkdirSync(work, { recursive: true });
-  const { PROJECT_PROJECT: _inherited, ...inherited } = process.env;
-  const env: NodeJS.ProcessEnv = { ...inherited, XDG_CONFIG_HOME: join(root, 'xdg'), HOME: join(root, 'home'), USERPROFILE: join(root, 'home') };
+  const env: NodeJS.ProcessEnv = isolatedCliEnv(root);
   return {
     root,
     registryDir: join(root, 'xdg', 'project'),

@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { normalizePath, toNativePath } from '@wadeck-app/project-sdk';
+import { defaultRegistryDir, normalizePath, toNativePath } from '@wadeck-app/project-sdk';
 import { run } from './run.js';
 
 export interface Outcome {
@@ -48,3 +49,35 @@ export function makeHarness(): Harness {
 
 /** A stored path as the CLI prints it for people: backslashes on Windows (see toNativePath in the SDK). */
 export const native = (path: string): string => toNativePath(path);
+
+/**
+ * The environment for a CLI process under test: its own registry/config folder, home, global npm prefix and an unreachable npm registry,
+ * with the automatic update switched off. Nothing it starts can reach the real ~/.config/project or the real global npm.
+ */
+export function isolatedCliEnv(root: string): NodeJS.ProcessEnv {
+  const { PROJECT_PROJECT: _inherited, ...inherited } = process.env;
+  mkdirSync(join(root, 'xdg', 'project'), { recursive: true });
+  writeFileSync(join(root, 'xdg', 'project', 'config.yml'), 'autoUpdate: false\n');
+  return {
+    ...inherited,
+    XDG_CONFIG_HOME: join(root, 'xdg'),
+    HOME: join(root, 'home'),
+    USERPROFILE: join(root, 'home'),
+    npm_config_prefix: join(root, 'npm-prefix'),
+    npm_config_registry: 'http://127.0.0.1:9/',
+  };
+}
+
+/** Size and mtime of what an update or a rollback would write in the REAL environment: the global install of the CLI and the real update files. Read-only. */
+export function realStateSnapshot(): Record<string, string> {
+  const describe = (file: string): string => (existsSync(file) ? `${statSync(file).size}:${statSync(file).mtimeMs}` : 'missing');
+  const globalRoot = execSync('npm root -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const configDir = defaultRegistryDir(process.env);
+  return {
+    'global package.json': describe(join(globalRoot, '@wadeck-app', 'project-cli', 'package.json')),
+    'update-state.json': describe(join(configDir, 'update-state.json')),
+    'update-cache.json': describe(join(configDir, 'update-cache.json')),
+    'update-notice-shown.json': describe(join(configDir, 'update-notice-shown.json')),
+    'update.lock': describe(join(configDir, 'update.lock')),
+  };
+}

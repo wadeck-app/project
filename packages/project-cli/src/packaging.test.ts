@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { isolatedCliEnv } from './testHelpers.js';
 
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = join(packageDir, '..', '..');
@@ -23,12 +24,10 @@ function runBundleScript(env: NodeJS.ProcessEnv): Outcome {
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
-// Every bundle run schedules a background update after its command: it must never see the real config folder, and
-// "autoUpdate: false" keeps it from ever installing anything.
+// Every bundle run schedules a background update after its command: it must never see the real config folder or the real global npm,
+// and "autoUpdate: false" (written by isolatedCliEnv) keeps it from ever installing anything.
 const sandbox = mkdtempSync(join(tmpdir(), 'project-cli-dist-env-'));
-const isolatedEnv = { XDG_CONFIG_HOME: join(sandbox, 'xdg'), HOME: join(sandbox, 'home'), USERPROFILE: join(sandbox, 'home') };
-mkdirSync(join(sandbox, 'xdg', 'project'), { recursive: true });
-writeFileSync(join(sandbox, 'xdg', 'project', 'config.yml'), 'autoUpdate: false\n');
+const isolatedEnv = isolatedCliEnv(sandbox);
 afterAll(() => rmSync(sandbox, { recursive: true, force: true }));
 
 function node(script: string, args: string[]): Outcome {
@@ -58,6 +57,12 @@ describe('the bundle (ci/scripts/bundle.ts)', () => {
 
   it('keeps the updater bundle under 500 KB', () => {
     expect(statSync(join(bundleDir, 'project-updater.cjs')).size).toBeLessThan(500 * 1024);
+  });
+
+  it('bundles the updater that journals an install and repairs an interrupted one (shared-updater 2026.10.25-019 or later)', () => {
+    const updater = readFileSync(join(bundleDir, 'project-updater.cjs'), 'utf8');
+    expect(updater, 'the repair of an interrupted "npm install -g" is missing: the lockfile pins an old shared-updater').toContain('repairInterruptedInstall');
+    expect(updater).toContain("'applying'");
   });
 
   it('prints the stamped version, whatever the package.json says', () => {

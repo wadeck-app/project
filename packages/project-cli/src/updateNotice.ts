@@ -16,3 +16,8 @@ export function updateNoticeLines(state: UpdateState | null): string[] {
       return [];
   }
 }
+
+/** An update that was cut short inside the install: the state says what was being installed and what to go back to. */
+export function interruptedUpdateLine(state: Pick<UpdateState, 'targetVersion' | 'previousVersion'>): string {
+  return `[project] An update to v${state.targetVersion} was interrupted (previous version v${state.previousVersion}). Repair it with: project cli update`;
+}

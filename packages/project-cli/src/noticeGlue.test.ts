@@ -102,3 +102,77 @@ describe('showUpdateNotice with a state that has no timestamp', () => {
     }
   });
 });
+
+describe('showUpdateNotice with an update that is being applied', () => {
+  let dir: string;
+  let written: string[];
+  const NOW = 10_000_000;
+  const MIN = 60_000;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'project-cli-notice-'));
+    written = [];
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  const stateFile = () => join(dir, 'update-state.json');
+  const applying = (extra: Record<string, unknown> = {}) => ({ status: 'applying', currentVersion: '1', previousVersion: '1', targetVersion: '2', pid: 4242, timestamp: NOW - MIN, ...extra });
+  const show = (alive: boolean, argv: string[] = ['list']) =>
+    showUpdateNotice({
+      configDir: dir,
+      argv,
+      manager: new UpdateManager('@wadeck-app/project-cli', dir),
+      print: (line) => written.push(line),
+      warn: () => undefined,
+      isPidAlive: () => alive,
+      now: () => NOW,
+    });
+  const INTERRUPTED = '[project] An update to v2 was interrupted (previous version v1). Repair it with: project cli update';
+
+  it('says nothing while the updater that applies it is alive and the state is recent', () => {
+    writeFileSync(stateFile(), JSON.stringify(applying()));
+    show(true);
+    expect(written).toEqual([]);
+    expect(JSON.parse(readFileSync(stateFile(), 'utf8')).status).toBe('applying');
+  });
+
+  it('reports an interrupted update when the pid is dead, once, and keeps the state for the updater to repair', () => {
+    writeFileSync(stateFile(), JSON.stringify(applying()));
+    show(false);
+    show(false);
+    expect(written).toEqual([INTERRUPTED]);
+    expect(JSON.parse(readFileSync(stateFile(), 'utf8')).status).toBe('applying');
+  });
+
+  it('reports it when the state is older than 15 minutes, even if the pid looks alive (pid reuse)', () => {
+    writeFileSync(stateFile(), JSON.stringify(applying({ timestamp: NOW - 16 * MIN })));
+    show(true);
+    expect(written).toEqual([INTERRUPTED]);
+  });
+
+  it('with no pid in the state, only its age tells: recent says nothing, old reports', () => {
+    writeFileSync(stateFile(), JSON.stringify(applying({ pid: undefined })));
+    show(false);
+    expect(written).toEqual([]);
+    writeFileSync(stateFile(), JSON.stringify(applying({ pid: undefined, timestamp: NOW - 20 * MIN })));
+    show(false);
+    expect(written).toEqual([INTERRUPTED]);
+  });
+
+  it('a new interrupted state is reported again; the repaired result takes over afterwards', () => {
+    writeFileSync(stateFile(), JSON.stringify(applying()));
+    show(false);
+    writeFileSync(stateFile(), JSON.stringify(applying({ timestamp: NOW - 2 * MIN, targetVersion: '3' })));
+    show(false);
+    expect(written).toEqual([INTERRUPTED, '[project] An update to v3 was interrupted (previous version v1). Repair it with: project cli update']);
+    writeFileSync(stateFile(), JSON.stringify({ status: 'rolled-back', targetVersion: '3', previousVersion: '1', timestamp: NOW }));
+    show(false);
+    expect(written[2]).toContain('Rolled back to v1');
+  });
+
+  it('is skipped for cli rollback, like the other statuses', () => {
+    writeFileSync(stateFile(), JSON.stringify(applying()));
+    show(false, ['cli', 'rollback']);
+    expect(written).toEqual([]);
+  });
+});

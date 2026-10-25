@@ -8,7 +8,7 @@ function makeDeps(overrides: Partial<UpdaterDeps> = {}) {
   const deps: UpdaterDeps = {
     env: {},
     configDir: '/cfg',
-    version: '1.0.0',
+    version: '2026.10.25-019-97c1ee11',
     nodePath: 'node',
     npmRootGlobal: () => '/npm/root',
     runUpdater: vi.fn(async () => undefined),
@@ -32,7 +32,7 @@ describe('runProjectUpdater', () => {
     expect(code).toBe(0);
     expect(deps.env['UPDATER_SELF_CHECK_CMD']).toContain('cli self-check');
     const config = vi.mocked(deps.runUpdater).mock.calls[0]![0];
-    expect(config).toMatchObject({ pkgName: '@wadeck-app/project-cli', configDir: '/cfg', currentVersion: '1.0.0', strategy: 'without-daemon' });
+    expect(config).toMatchObject({ pkgName: '@wadeck-app/project-cli', configDir: '/cfg', currentVersion: '2026.10.25-019-97c1ee11', strategy: 'without-daemon' });
     await expect((config as { onUpdateAvailable: (v: string) => Promise<unknown> }).onUpdateAvailable('2')).resolves.toBe('apply-now');
   });
 
@@ -54,16 +54,16 @@ describe('runProjectUpdater', () => {
     expect(code).toBe(1);
     expect(deps.runUpdater).not.toHaveBeenCalled();
     expect(err.join('\n')).toMatch(/\[project-updater\] fatal: cannot find the global npm folder.*spawn npm ENOENT/s);
-    expect(writtenStates).toEqual([{ status: 'failed', currentVersion: '1.0.0', error: expect.stringContaining('spawn npm ENOENT'), timestamp: 5000 }]);
+    expect(writtenStates).toEqual([{ status: 'failed', currentVersion: '2026.10.25-019-97c1ee11', error: expect.stringContaining('spawn npm ENOENT'), timestamp: 5000 }]);
   });
 
   it('prints what this run did only when the user asked for the update', async () => {
     const quiet = makeDeps();
     await runProjectUpdater(quiet.deps);
     expect(quiet.out).toEqual([]);
-    const forced = makeDeps({ env: { UPDATER_FORCE: '1' }, readCache: () => ({ lastCheckedAt: 9000, latestVersion: '1.0.0' }) });
+    const forced = makeDeps({ env: { UPDATER_FORCE: '1' }, readCache: () => ({ lastCheckedAt: 9000, latestVersion: '2026.10.25-019-97c1ee11' }) });
     await runProjectUpdater(forced.deps);
-    expect(forced.out).toEqual(['[project-updater] current: 1.0.0', '[project-updater] latest:  1.0.0', '[project-updater] status:  up to date']);
+    expect(forced.out).toEqual(['[project-updater] current: 2026.10.25-019-97c1ee11', '[project-updater] latest:  2026.10.25-019-97c1ee11', '[project-updater] status:  up to date']);
   });
 
   it('reports a crash of the updater, with the outcome when forced, and exits 1', async () => {
@@ -72,5 +72,16 @@ describe('runProjectUpdater', () => {
     expect(code).toBe(1);
     expect(err).toContain('[project-updater] fatal: Error: boom');
     expect(out).toHaveLength(3);
+  });
+});
+
+describe('runProjectUpdater in a development build', () => {
+  it('refuses to run: a repo-built updater must never touch the global install', async () => {
+    const { deps, err, writtenStates } = makeDeps({ version: '0.0.0-local' });
+    const code = await runProjectUpdater(deps);
+    expect(code).toBe(1);
+    expect(deps.runUpdater).not.toHaveBeenCalled();
+    expect(err.join('\n')).toMatch(/\[project-updater\] fatal: .*development build \(version 0\.0\.0-local/);
+    expect(writtenStates).toEqual([]);
   });
 });

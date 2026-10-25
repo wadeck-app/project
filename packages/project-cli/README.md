@@ -21,6 +21,10 @@ After every command a detached background run checks the `latest` channel and in
 
 The notice of a successful update is shown once (`update-notice-shown.json` remembers it) but the update state is kept, so `project cli rollback` keeps working until the next update; `cli rollback` itself shows no notice and does not touch the state. Failure notices are shown once and cleared.
 
+An update is journalled before `npm install -g` runs (`status: applying` in the update state); if the updater is killed in the middle, the next updater run repairs the install, and the next command says `An update to vX was interrupted (previous version vY). Repair it with: project cli update`.
+
+Only a stamped release (`YYYY.M.D-NNN-<8 hex>`) updates itself. A repo-built or locally bundled CLI never schedules the background update, and `project cli update` / `project cli rollback` refuse with a clear error: they would replace the real global install.
+
 | Command | What it does |
 |---|---|
 | `project cli update` | Update now, ignoring the cache and `autoUpdate: false`; prints current, latest and status. `--check` only shows the available version, `--log` prints the update log (same file as `cli logs`) |
