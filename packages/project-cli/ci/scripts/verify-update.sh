@@ -17,7 +17,19 @@ PACKAGE="@wadeck-app/project-cli"
 isolate_env
 
 step "(e0) find the version published before $VERSION"
-PREVIOUS="$(npm view "$PACKAGE" versions --json | node "$SCRIPT_DIR/previous-version.mjs" "$VERSION")"
+VERSIONS=""
+for attempt in 1 2 3 4; do
+  status=0
+  VERSIONS="$(npm view "$PACKAGE" versions --json 2> "$(last_stderr_file)")" || status=$?
+  if [ "$status" -eq 0 ]; then
+    break
+  fi
+  echo "npm view $PACKAGE versions failed (attempt $attempt of 4), retrying in 10 s"
+  cat "$(last_stderr_file)" >&2
+  sleep 10
+done
+[ "$status" -eq 0 ] || fail "npm view $PACKAGE versions --json did not succeed after 4 attempts"
+PREVIOUS="$(printf '%s' "$VERSIONS" | node "$SCRIPT_DIR/previous-version.mjs" "$VERSION" | tr -d '\r')"
 if [ -z "$PREVIOUS" ]; then
   echo "SKIPPED: there is no version published before $VERSION, nothing to update from (first publication)"
   exit 0
@@ -27,19 +39,20 @@ echo "previous version: $PREVIOUS"
 step "(e1) npm install -g $PACKAGE@$PREVIOUS"
 install_global "$PACKAGE@$PREVIOUS"
 choose_runner
-assert_equals "installed version" "$PREVIOUS" "$(installed_version)"
+first_run
+ACTUAL="$(installed_version)"
+assert_equals "installed version" "$PREVIOUS" "$ACTUAL"
 
 step "(e2) project cli update installs $VERSION"
-project cli update
-assert_equals "installed version after the update" "$VERSION" "$(installed_version)"
+update_to "$VERSION"
 
 step "(e3) project cli rollback puts $PREVIOUS back"
-project cli rollback
-assert_equals "installed version after the rollback" "$PREVIOUS" "$(installed_version)"
+run_project cli rollback || fail "project cli rollback exited with status $?"
+ACTUAL="$(installed_version)"
+assert_equals "installed version after the rollback" "$PREVIOUS" "$ACTUAL"
 
 step "(e4) project cli update installs $VERSION again"
-project cli update
-assert_equals "installed version after the second update" "$VERSION" "$(installed_version)"
+update_to "$VERSION"
 
 echo
 echo "verify-update: all steps passed ($PREVIOUS -> $VERSION -> $PREVIOUS -> $VERSION) on $(uname -s)"
