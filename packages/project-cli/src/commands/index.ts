@@ -9,6 +9,7 @@ import { parentClearCommand, parentSetCommand } from './parent.js';
 import { pathCommand } from './path.js';
 import { pathsAddCommand, pathsMainCommand, pathsMoveCommand, pathsRemoveCommand } from './paths.js';
 import { removeCommand } from './remove.js';
+import { restoreCommand } from './restore.js';
 import { renameCommand } from './rename.js';
 import { resolveCommand } from './resolve.js';
 import { showCommand } from './show.js';
@@ -34,5 +35,6 @@ export const COMMANDS: Command[] = [
   labelAddCommand,
   labelRemoveCommand,
   removeCommand,
+  restoreCommand,
   ...CLI_COMMANDS,
 ];

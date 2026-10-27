@@ -30,6 +30,9 @@ export type { MutationOptions } from './update.js';
 export { type AddProjectInput, addAlias, addProject, removeAlias, renameProject, setGit, setParent } from './projectMutations.js';
 export { addPath, movePath, removePath, setMain } from './pathMutations.js';
 export { removeProject } from './removal.js';
+export { restoreProject } from './restore.js';
+export { formatQualifiedId, parseQualifiedId, resolveQualifiedId } from './qualifiedId.js';
+export { type Origin, buildOrigin, formatOrigin } from './origin.js';
 
 export { levenshtein, resolveReference } from './references.js';
 export {

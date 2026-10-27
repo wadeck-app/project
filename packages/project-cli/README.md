@@ -60,6 +60,8 @@ Labels (meta information such as `state::production` or `sandbox`; rules in the 
 
 Paths are stored, logged and put in `--json` with forward slashes (the same on every platform, for scripts). What people read uses the platform's form: backslashes on Windows (`list`, `show`, `resolve`, `add`, `paths ...`, `remove`, the resolution line on stderr, error messages and the suggested `project add "C:\Users\me\work\shop"`). `project path <ref>` prints the stored form, so `cd "$(project path shop)"` works in any shell.
 
+`project restore <ref> [--recursive]` brings a removed project back with its data (`<ref>` is an id, or a name or alias of a removed project, and is required); `--recursive` also restores the removed projects below it, parents first, all or none. The parent must be live, and a name, alias or path that a live project took in the meantime is an error naming that project. `project list --deleted` lists the removed projects with the date of their removal (`--json`, `--label` work; `labels` is always an array). The change is logged as `mutation: restore project <name> (<id>)`.
+
 `project remove` requires an explicit `<ref>` (no `--project`, no environment variable, no cwd): a destructive command never acts on an implicit target.
 
 SDK errors are neutral; the CLI adds a `hint:` line with its own flags (`--recursive`, `--new-main`, `--name`) built from the error data, or carried by it (`NoProjectInScopeError.hint`).

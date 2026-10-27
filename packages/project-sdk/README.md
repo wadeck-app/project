@@ -24,7 +24,7 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
 - Paths are stored with forward slashes; error messages, the NoProjectInScopeError hint included, show them in the native form (`toNativePath`: backslashes on Windows), while the data of the errors (`cwd`, `path`) stays as stored.
 - Paths stay purely string-based (`normalizePath`, `pathKey`), but matching also compares real folders (`fs.realpathSync.native`): a cwd reached through a junction, symlink or 8.3 short name resolves, and registering a link to a folder another project owns is refused. A registered path that no longer exists is matched by its normalized path only.
 - Reads (`loadRegistry`) take no lock and skip full validation. A missing `registry.json` (or `deleted_projects.json`) is the first-use state: an empty registry, nothing is created. Every mutation: lock, load, change, `validateRegistry`, atomic write.
-- `removeProject` is a soft delete; `projects/<id>/` is never deleted.
+- `removeProject` is a soft delete; `projects/<id>/` is never deleted. `restoreProject` brings a project back (see Restore).
 
 ## API
 
@@ -36,7 +36,8 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
 | Projects | `addProject` (`labels?`), `renameProject`, `addAlias`, `removeAlias`, `setParent`, `setGit`, `removeProject(registryDir, ref, { recursive })` |
 | Paths | `addPath(.., { main })`, `removePath(.., { newMain })`, `movePath`, `setMain` |
 | Options | `extractProjectOption(argv, env, envName)`, `resolveProjectFromArgs(registry, argv, env, envName, cwd)` |
-| Lookup | `findProjectIncludingDeleted(registryDir, id)` |
+| Lookup | `findProjectIncludingDeleted(registryDir, id)`, `restoreProject(registryDir, ref, { recursive? })` |
+| Ids and origin | `formatQualifiedId`, `parseQualifiedId`, `resolveQualifiedId(registry, input, fallback?)`, `buildOrigin(tool, scope?, now?)`, `formatOrigin` |
 | Resolution | `resolveReference`, `findProjectForPath`, `resolveScope` (flag > env > cwd; `label` names the source of an explicit reference), `describeResolution`, `requirePath` |
 | Inheritance | `getChain`, `getAncestors` (parent first), `getChildren`, `getDescendants` (breadth-first, cycle-safe; the project itself is never included), `getConfigLayers`, `projectToolDir(registryDir, id, tool, kind, { ensure })` with kind `config`, `data`, `cache` or `logs` (`<registryDir>/projects/<id>/<tool>/<kind>`) |
 | Config helpers | `validateLayer`, `mergeLayers(schema, layers)`, root-first with the project's own layer last; `ConfigSchema` scopes `global`, `local`, `inherit`; merges `replace`, `deep`, `append`; the CLIs parse the files |
@@ -55,6 +56,8 @@ All extend `ProjectError` (`code`, actionable message). Messages name no API opt
 | `InvalidProjectLabelError` | `INVALID_PROJECT_LABEL` (`input`, `reason`) |
 | `InvalidLabelSelectorError` | `INVALID_LABEL_SELECTOR` (`input`, `reason`) |
 | `ProjectLabelNotFoundError` | `PROJECT_LABEL_NOT_FOUND` (`label`, `project`) |
+| `InvalidQualifiedIdError` | `INVALID_QUALIFIED_ID` (`input`, `reason`) |
+| `RestoreConflictError` | `RESTORE_CONFLICT` (`project`, `conflictsWith?`) |
 | `LabelTakenError` | `LABEL_TAKEN` (`kind`, `label`, `owner?`) |
 | `InvalidIdError` | `INVALID_ID` |
 | `InvalidPathError` | `INVALID_PATH` (`path?`) |
@@ -75,6 +78,22 @@ All extend `ProjectError` (`code`, actionable message). Messages name no API opt
 | `DanglingParentError` | `DANGLING_PARENT` |
 | `ParentCycleError` | `PARENT_CYCLE` |
 | `ConfigSchemaError` | `CONFIG_SCHEMA` |
+
+## Restore
+
+`restoreProject(registryDir, ref, { recursive? })` puts a soft-deleted project back with the same id, name, aliases, paths, labels, git and parent (the data folder was never deleted). `ref` is an exact id, or an exact name or alias (case-insensitive) among the deleted projects; several deleted projects with that name are an `AmbiguousReferenceError` listing their ids and deletion dates (restore by id); no match is a `ProjectNotFoundError` with suggestions.
+
+- It runs in the registry lock with the normal full validation. A collision with a live project (name, alias, path), a path that no longer exists, or a parent that is not live is a `RestoreConflictError` naming what is in the way and the fix; nothing changes.
+- With `recursive`, the deleted descendants come back too, parents before children, all or none.
+- `registry.json` is written first, then the entry leaves `deleted_projects.json`. After a crash an id may be in both files: it is live, it cannot be restored, and the stale entry is dropped by the next restore or removal.
+
+## Project-qualified ids
+
+Recommended syntax for task, flow and queue to name an id (task, run, event) of another project: `<project>/<id>`, for example `task show shop/abc123`. The project is an id, a name or an alias; a local id never contains `/`. `parseQualifiedId` splits on the first `/` (no `/`: no project part; an empty part or a second `/`: `InvalidQualifiedIdError`), `formatQualifiedId(projectId, localId)` is the inverse, and `resolveQualifiedId(registry, input, fallback?)` resolves the project part like any reference and uses `fallback` (the project in scope) when there is none, failing clearly when there is neither.
+
+## Origin of an action
+
+The shape that task, flow and queue record in the task history, in event payloads and in the hook context when an action crosses projects: `Origin = { tool, at (ISO), projectId?, projectName?, cwd? (stored forward-slash form) }`. `buildOrigin(tool, scope?, now?)` takes the project fields from the scope when there is one (none otherwise, "when available"), never an environment value or a credential. `formatOrigin` gives the human line: `task from shop (3fa9c1d2) at C:\work\shop` (native path) or `task from outside any project`.
 
 ## Project labels
 

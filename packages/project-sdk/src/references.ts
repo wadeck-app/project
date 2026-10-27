@@ -25,7 +25,7 @@ interface Suggestion {
   project: ProjectRef;
 }
 
-function suggest(registry: Registry, reference: string): (Suggestion & { isName: boolean })[] {
+export function suggest(registry: Registry, reference: string): (Suggestion & { isName: boolean })[] {
   const maxDistance = Math.max(2, Math.floor(reference.length / 3));
   const candidates = registry.projects
     .flatMap((project) => [project.name, ...project.aliases].map((text) => ({ text, project, distance: levenshtein(reference, text) })))

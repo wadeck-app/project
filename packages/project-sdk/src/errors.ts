@@ -244,3 +244,28 @@ export class ProjectOptionError extends ProjectError {
     this.option = details.option;
   }
 }
+
+export class InvalidQualifiedIdError extends ProjectError {
+  /** The text as it was given. */
+  readonly input: string;
+  readonly reason: string;
+
+  constructor(message: string, details: { input: string; reason: string }) {
+    super('INVALID_QUALIFIED_ID', message);
+    this.input = details.input;
+    this.reason = details.reason;
+  }
+}
+
+export class RestoreConflictError extends ProjectError {
+  /** The deleted project that cannot be restored. */
+  readonly project: ProjectRef;
+  /** The live project in the way (same name, alias or path, or the missing parent), when there is one. */
+  readonly conflictsWith: ProjectRef | undefined;
+
+  constructor(message: string, details: { project: ProjectRef; conflictsWith?: ProjectRef }) {
+    super('RESTORE_CONFLICT', message);
+    this.project = details.project;
+    this.conflictsWith = details.conflictsWith;
+  }
+}

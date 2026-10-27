@@ -8,7 +8,7 @@ import * as sdk from './index.js';
 const here = dirname(fileURLToPath(import.meta.url));
 
 const FUNCTIONS = [
-  'defaultRegistryDir', 'projectDir', 'findProjectIncludingDeleted', 'extractProjectOption', 'resolveProjectFromArgs', 'mainPath', 'isVirtual', 'describeProject', 'deriveName', 'parseLabel', 'formatLabel', 'normalizeProjectLabel', 'labelsOf', 'hasLabel', 'matchesSelectors', 'filterProjects', 'addLabels', 'removeLabels', 'generateId', 'isIdLike', 'normalizeLabel', 'normalizePath', 'toNativePath', 'pathKey', 'isSameOrInside', 'assertDirectory',
+  'defaultRegistryDir', 'projectDir', 'findProjectIncludingDeleted', 'restoreProject', 'formatQualifiedId', 'parseQualifiedId', 'resolveQualifiedId', 'buildOrigin', 'formatOrigin', 'extractProjectOption', 'resolveProjectFromArgs', 'mainPath', 'isVirtual', 'describeProject', 'deriveName', 'parseLabel', 'formatLabel', 'normalizeProjectLabel', 'labelsOf', 'hasLabel', 'matchesSelectors', 'filterProjects', 'addLabels', 'removeLabels', 'generateId', 'isIdLike', 'normalizeLabel', 'normalizePath', 'toNativePath', 'pathKey', 'isSameOrInside', 'assertDirectory',
   'writeFileAtomic', 'withRegistryLock', 'lockFilePath',
   'loadRegistry', 'loadDeleted', 'registryFilePath', 'deletedFilePath', 'validateRegistry',
   'addProject', 'renameProject', 'addAlias', 'removeAlias', 'setParent', 'setGit', 'removeProject',
@@ -21,7 +21,7 @@ const ERRORS = [
   'InvalidLabelError', 'LabelTakenError', 'InvalidPathError', 'PathOwnedError', 'MainPathError', 'HasChildrenError',
   'InvalidToolError', 'InvalidIdError', 'AtomicWriteError', 'LockTimeoutError', 'LockLostError', 'RegistryCorruptError',
   'RegistryInvalidError', 'ProjectNotFoundError', 'AmbiguousReferenceError', 'NoProjectInScopeError', 'VirtualProjectError',
-  'DanglingParentError', 'ParentCycleError', 'ConfigSchemaError', 'UnsupportedSchemaVersionError', 'InvalidProjectLabelError', 'InvalidLabelSelectorError', 'ProjectLabelNotFoundError', 'ProjectOptionError',
+  'DanglingParentError', 'ParentCycleError', 'ConfigSchemaError', 'UnsupportedSchemaVersionError', 'InvalidProjectLabelError', 'InvalidLabelSelectorError', 'ProjectLabelNotFoundError', 'ProjectOptionError', 'InvalidQualifiedIdError', 'RestoreConflictError',
 ] as const;
 
 const DETAILS: Record<string, unknown> = {
@@ -34,6 +34,8 @@ const DETAILS: Record<string, unknown> = {
   InvalidProjectLabelError: { input: 'x', reason: 'r' },
   InvalidLabelSelectorError: { input: 'x', reason: 'r' },
   ProjectOptionError: { kind: 'repeated', option: '-p' },
+  InvalidQualifiedIdError: { input: 'x', reason: 'r' },
+  RestoreConflictError: { project: { id: '00000001', name: 'a' } },
   ProjectLabelNotFoundError: { label: 'x', project: { id: '00000001', name: 'a' } },
 };
 
