@@ -85,6 +85,10 @@ Same stack as the task and queue CLIs. `npm run bundle` (esbuild, needs `BUNDLE_
 
 The canonical launcher template has no `windowsHide` and no `--cli-background` / `--cli-foreground` handling, which the task and queue copies added; the project CLI needs neither (no daemon, nothing spawns it in the background). If one day it does, change the template in `ci-templates` and copy it again.
 
+Platforms: Windows x64, macOS arm64 and macOS x64 have a platform package. **Linux has none yet**: the canonical template of `ci-templates` only knows those three (on Linux the `project` command prints `unsupported platform linux-x64`), although the Go launcher builder of `singleton-daemon-kit` now also builds `linux/amd64` and `linux/arm64`. Supporting Linux needs a change in `ci-templates` (a `linux-x64` entry in the template and the generator, then the same here); it is deliberately not forked here. Until then `node <global node_modules>/@wadeck-app/project-cli/project.cjs` runs the CLI on Linux, and that is what the Linux leg of the install check does.
+
+Install check: after each publish the job `verify-install` installs the published version on Linux, macOS and Windows in a temp environment and runs `ci/scripts/verify-install.sh <version>` (install, `--version`, `cli self-check`, a smoke test) and `ci/scripts/verify-update.sh <version>` (the previous published version updates itself, rolls back, updates again). Both can be run locally; see their headers.
+
 ## Development
 
 `npm run build` then `npm test` from the repo root. Unit tests call `run(argv, io, env, cwd)` in-process; the end-to-end suite spawns the built `dist/main.js` with `XDG_CONFIG_HOME`, `HOME` and `USERPROFILE` redirected to temp dirs (a missing build fails it). `src/packaging.test.ts` builds the bundles with a fake version and checks the generated packages (names, `files`, versions, `npm pack` content). `npm run build-launcher` needs `go` and `bash`.

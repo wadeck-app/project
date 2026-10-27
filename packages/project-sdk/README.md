@@ -38,7 +38,7 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
 | Options | `extractProjectOption(argv, env, envName)`, `resolveProjectFromArgs(registry, argv, env, envName, cwd)` |
 | Lookup | `findProjectIncludingDeleted(registryDir, id)` |
 | Resolution | `resolveReference`, `findProjectForPath`, `resolveScope` (flag > env > cwd; `label` names the source of an explicit reference), `describeResolution`, `requirePath` |
-| Inheritance | `getChain`, `getConfigLayers`, `projectToolDir(registryDir, id, tool, kind, { ensure })` with kind `config`, `data`, `cache` or `logs` (`<registryDir>/projects/<id>/<tool>/<kind>`) |
+| Inheritance | `getChain`, `getAncestors` (parent first), `getChildren`, `getDescendants` (breadth-first, cycle-safe; the project itself is never included), `getConfigLayers`, `projectToolDir(registryDir, id, tool, kind, { ensure })` with kind `config`, `data`, `cache` or `logs` (`<registryDir>/projects/<id>/<tool>/<kind>`) |
 | Config helpers | `validateLayer`, `mergeLayers(schema, layers)`, root-first with the project's own layer last; `ConfigSchema` scopes `global`, `local`, `inherit`; merges `replace`, `deep`, `append`; the CLIs parse the files |
 | Infra | `withRegistryLock`, `writeFileAtomic`, `lockFilePath` |
 | Helpers | `toNativePath(path, platform?)`, `normalizePath(path, base?)`, `pathKey(path, base?)`, `isSameOrInside`, `assertDirectory`, `generateId`, `isIdLike`, `normalizeLabel`, `deriveName(path)`, `describeProject(project)`, `mainPath(project)`, `isVirtual(project)`, `levenshtein` |

@@ -14,7 +14,7 @@ const FUNCTIONS = [
   'addProject', 'renameProject', 'addAlias', 'removeAlias', 'setParent', 'setGit', 'removeProject',
   'addPath', 'removePath', 'movePath', 'setMain',
   'resolveReference', 'levenshtein', 'findProjectForPath', 'resolveScope', 'describeResolution', 'requirePath',
-  'getChain', 'projectToolDir', 'getConfigLayers', 'validateLayer', 'mergeLayers',
+  'getChain', 'getChildren', 'getDescendants', 'getAncestors', 'projectToolDir', 'getConfigLayers', 'validateLayer', 'mergeLayers',
 ] as const;
 
 const ERRORS = [

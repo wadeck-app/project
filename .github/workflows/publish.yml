@@ -51,6 +51,9 @@ jobs:
         needs: [build-and-test]
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         runs-on: ubuntu-latest
+        # The version that was published: verify-install installs exactly this one
+        outputs:
+            version: ${{ steps.version.outputs.version }}
         steps:
             - uses: actions/checkout@v5
               with:
@@ -138,5 +141,39 @@ jobs:
             - name: Publish main package (@wadeck-app/project-cli)
               working-directory: packages/project-cli-dist
               run: npm publish --tag ${{ steps.version.outputs.dist_tag }}
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # What was just published is installed from the registry on the three systems, in an isolated temp environment (npm prefix, config folder, home).
+    # Skipped when publish did not run. The same scripts can be run locally: see the header of verify-install.sh.
+    verify-install:
+        needs: [publish]
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+        runs-on: ${{ matrix.os }}
+        permissions:
+            contents: read
+            packages: read
+        defaults:
+            run:
+                shell: bash
+        steps:
+            - uses: actions/checkout@v5
+
+            - uses: actions/setup-node@v5
+              with:
+                  node-version: '24'
+                  registry-url: 'https://npm.pkg.github.com'
+                  scope: '@wadeck-app'
+
+            - name: Install the published version and check it works (install, --version, self-check, smoke test)
+              run: bash packages/project-cli/ci/scripts/verify-install.sh "${{ needs.publish.outputs.version }}"
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Update from the previous published version, roll back, update again
+              run: bash packages/project-cli/ci/scripts/verify-update.sh "${{ needs.publish.outputs.version }}"
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

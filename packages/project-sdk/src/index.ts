@@ -43,7 +43,7 @@ export {
   resolveScope,
 } from './resolution.js';
 
-export { getChain } from './chain.js';
+export { getAncestors, getChain, getChildren, getDescendants } from './chain.js';
 export { type ConfigLayer, type ToolDirKind, getConfigLayers, projectDir, projectToolDir } from './toolDirs.js';
 export {
   type ConfigScope,
