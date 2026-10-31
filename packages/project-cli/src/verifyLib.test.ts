@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { bashCommand, removeTempDir } from './testHelpers.js';
 
 const scripts = join(dirname(fileURLToPath(import.meta.url)), '..', 'ci', 'scripts').replace(/\\/g, '/');
 const lines = (text: string): string[] => text.trim().split(/\r?\n/);
@@ -14,10 +15,10 @@ describe('ci/scripts/verify-lib.sh', () => {
   beforeEach(() => {
     work = mkdtempSync(join(tmpdir(), 'project-cli-verifylib-'));
   });
-  afterEach(() => rmSync(work, { recursive: true, force: true }));
+  afterEach(() => removeTempDir(work));
 
   const bash = (script: string) =>
-    spawnSync('bash', ['-c', `source ${scripts}/verify-lib.sh; ${script}`], { encoding: 'utf8', env: { ...process.env, VERIFY_ROOT: work.replace(/\\/g, '/') } });
+    spawnSync(bashCommand(), ['-c', `source ${scripts}/verify-lib.sh; ${script}`], { encoding: 'utf8', env: { ...process.env, VERIFY_ROOT: work.replace(/\\/g, '/') } });
 
   it('isolates npm, the config folder and the home in the temp root, and switches the automatic update off', () => {
     const result = bash('isolate_env; echo "$npm_config_prefix"; echo "$XDG_CONFIG_HOME"; echo "$HOME"; echo "$USERPROFILE"; cat "$XDG_CONFIG_HOME/project/config.yml"');

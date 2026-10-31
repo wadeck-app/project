@@ -25,7 +25,7 @@ async function inTempRegistry(body: (registryDir: string) => Promise<void>): Pro
   try {
     await body(join(root, 'registry'));
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   }
 }
 

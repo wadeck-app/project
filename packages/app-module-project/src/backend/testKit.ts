@@ -104,8 +104,14 @@ export function makeWorld(): World {
     },
     cleanup() {
       // Windows can refuse to remove a folder for a moment (antivirus, indexer): retry before failing.
-      rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
-      rmSync(registryDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+      for (const dir of [root, registryDir]) {
+        try {
+          rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+        } catch (error) {
+          // Never a failed test over a temp folder: said, and left for the user.
+          process.stderr.write(`[tests] could not remove ${dir} (${error instanceof Error ? error.message : String(error)}); delete it by hand\n`);
+        }
+      }
     },
   };
 }

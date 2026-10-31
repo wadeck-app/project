@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { removeTempDir } from './testHelpers.js';
 
 const sdk = vi.hoisted(() => ({
   registerModule: vi.fn(),
@@ -147,7 +148,7 @@ describe('attemptStagedRegistration', () => {
 
   function installModule(version: string): string {
     const dir = path.join(root, 'npm', 'app-module');
-    fs.rmSync(dir, { recursive: true, force: true });
+    removeTempDir(dir);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ version }));
     fs.writeFileSync(path.join(dir, 'backend.js'), `backend ${version}`);
@@ -162,7 +163,7 @@ describe('attemptStagedRegistration', () => {
   });
 
   afterEach(() => {
-    fs.rmSync(root, { recursive: true, force: true });
+    removeTempDir(root);
   });
 
   it('registers the STAGED manifest, not the npm one', async () => {
@@ -243,7 +244,7 @@ describe('registerWithAppCore stages an installed module', () => {
     } finally {
       if (saved === undefined) delete process.env['XDG_CONFIG_HOME'];
       else process.env['XDG_CONFIG_HOME'] = saved;
-      fs.rmSync(root, { recursive: true, force: true });
+      removeTempDir(root);
     }
   });
 });
@@ -264,7 +265,7 @@ describe('attemptUnregistration removes the staged copies (the signal of "regist
   afterEach(() => {
     if (savedXdg === undefined) delete process.env['XDG_CONFIG_HOME'];
     else process.env['XDG_CONFIG_HOME'] = savedXdg;
-    fs.rmSync(configRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    removeTempDir(configRoot);
   });
 
   it.each(['unregistered', 'not-registered', 'cleared', 'skipped'])('after the outcome "%s"', async (status) => {

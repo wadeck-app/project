@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { hasStagedModule, pruneStagedModules, removeStagedModules, stageAppModule, stagedModulesRoot } from './appModuleStaging.js';
+import { removeTempDir } from './testHelpers.js';
 
 let root: string;
 let configDir: string;
@@ -23,7 +24,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  fs.rmSync(root, { recursive: true, force: true });
+  removeTempDir(root);
 });
 
 describe('stageAppModule', () => {
@@ -39,7 +40,7 @@ describe('stageAppModule', () => {
   it('survives the removal of the npm folder (the point of staging)', () => {
     const source = writeModule(sourceDir, '1.0.0');
     const { manifestPath } = stageAppModule(source, configDir);
-    fs.rmSync(path.join(root, 'npm'), { recursive: true, force: true });
+    removeTempDir(path.join(root, 'npm'));
     expect(fs.existsSync(manifestPath)).toBe(true);
   });
 

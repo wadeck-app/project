@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { UpdateManager } from '@wadeck-app/shared-cli';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { showUpdateNotice } from './noticeGlue.js';
+import { removeTempDir } from './testHelpers.js';
 
 describe('showUpdateNotice', () => {
   let dir: string;
@@ -15,7 +16,7 @@ describe('showUpdateNotice', () => {
     written = [];
     warnings = [];
   });
-  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+  afterEach(() => removeTempDir(dir));
 
   const stateFile = () => join(dir, 'update-state.json');
   const writeState = (state: Record<string, unknown>) => writeFileSync(stateFile(), JSON.stringify(state));
@@ -98,7 +99,7 @@ describe('showUpdateNotice with a state that has no timestamp', () => {
       showUpdateNotice(deps);
       expect(written).toEqual(['[project] Updated to v2', '[project] Updated to v2']);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      removeTempDir(dir);
     }
   });
 });
@@ -113,7 +114,7 @@ describe('showUpdateNotice with an update that is being applied', () => {
     dir = mkdtempSync(join(tmpdir(), 'project-cli-notice-'));
     written = [];
   });
-  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+  afterEach(() => removeTempDir(dir));
 
   const stateFile = () => join(dir, 'update-state.json');
   const applying = (extra: Record<string, unknown> = {}) => ({ status: 'applying', currentVersion: '1', previousVersion: '1', targetVersion: '2', pid: 4242, timestamp: NOW - MIN, ...extra });

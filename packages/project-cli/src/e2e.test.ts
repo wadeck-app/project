@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type Project, loadDeleted, loadRegistry, normalizePath, toNativePath, validateRegistry } from '@wadeck-app/project-sdk';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { isolatedCliEnv } from './testHelpers.js';
+import { isolatedCliEnv, removeTempDir, significantStderr } from './testHelpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const entry = join(here, '..', 'dist', 'main.js');
@@ -31,7 +31,7 @@ function withoutFinalNewline(text: string): string {
 /** Real temporary home, XDG_CONFIG_HOME and work folders: the real ~/.config/project is never reachable from the spawned CLI. */
 function makeSandbox(): Sandbox {
   // Real path on purpose: on macOS the temporary directory is a symlink (/var -> /private/var) and the spawned CLI sees process.cwd() as the real path.
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'project-cli-e2e-')));
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'project-cli-e2e-')));
   const work = join(root, 'work');
   mkdirSync(work, { recursive: true });
   const env: NodeJS.ProcessEnv = isolatedCliEnv(root);
@@ -51,7 +51,7 @@ function makeSandbox(): Sandbox {
         child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
         child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()));
         child.on('error', reject);
-        child.on('close', (code) => resolve({ code, stdout: withoutFinalNewline(stdout), stderr: withoutFinalNewline(stderr) }));
+        child.on('close', (code) => resolve({ code, stdout: withoutFinalNewline(stdout), stderr: withoutFinalNewline(significantStderr(stderr)) }));
       }),
   };
 }
@@ -83,7 +83,7 @@ describe('end-to-end: a shop project with a worktree and a shared base', () => {
     worktree = sandbox.dir('shop-wt');
     elsewhere = sandbox.dir('elsewhere');
   });
-  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+  afterAll(() => removeTempDir(sandbox.root));
 
   // The steps build on each other and run in order.
   it('1. registers the folder with an alias', async () => {
@@ -182,7 +182,7 @@ describe('end-to-end: concurrent writers', () => {
   beforeAll(() => {
     sandbox = makeSandbox();
   });
-  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+  afterAll(() => removeTempDir(sandbox.root));
 
   it('7. keeps all 30 projects when two CLI processes add 15 each at the same time', async () => {
     const writer = async (prefix: string): Promise<Outcome[]> => {
@@ -208,7 +208,7 @@ describe('end-to-end: failures and isolation', () => {
   beforeAll(() => {
     sandbox = makeSandbox();
   });
-  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+  afterAll(() => removeTempDir(sandbox.root));
 
   it('8. names the corrupt registry.json in an actionable error', async () => {
     mkdirSync(sandbox.registryDir, { recursive: true });
@@ -234,7 +234,7 @@ describe('end-to-end: failures and isolation', () => {
       expect(existsSync(join(fresh.registryDir, 'registry.json'))).toBe(true);
       expect(existsSync(realRegistry) ? readFileSync(realRegistry, 'utf8') : undefined).toBe(before);
     } finally {
-      rmSync(fresh.root, { recursive: true, force: true });
+      removeTempDir(fresh.root);
     }
   });
 
@@ -247,7 +247,7 @@ describe('end-to-end: failures and isolation', () => {
       expect(result.stderr).toBe(`registry: ${join(home, '.config', 'project')}`);
       expect(existsSync(join(home, '.config', 'project', 'registry.json'))).toBe(true);
     } finally {
-      rmSync(fresh.root, { recursive: true, force: true });
+      removeTempDir(fresh.root);
     }
   });
 
@@ -265,7 +265,7 @@ describe('end-to-end: failures and isolation', () => {
       expect(result.stderr).toContain('waiting for the registry lock held by pid 4242');
       expect(loadRegistry(fresh.registryDir).projects.map((p) => p.name)).toEqual(['waiter']);
     } finally {
-      rmSync(fresh.root, { recursive: true, force: true });
+      removeTempDir(fresh.root);
     }
   });
 
@@ -286,7 +286,7 @@ describe('end-to-end: the update notice', () => {
     sandbox = makeSandbox();
     mkdirSync(sandbox.registryDir, { recursive: true });
   });
-  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+  afterAll(() => removeTempDir(sandbox.root));
 
   const stateFile = () => join(sandbox.registryDir, 'update-state.json');
 
@@ -314,7 +314,7 @@ describe('end-to-end: the logs', () => {
   beforeAll(() => {
     sandbox = makeSandbox();
   });
-  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+  afterAll(() => removeTempDir(sandbox.root));
 
   const today = () => new Date().toISOString().slice(0, 10);
 
@@ -338,12 +338,15 @@ describe('end-to-end: the logs', () => {
     const child = spawn(process.execPath, [entry, 'cli', 'logs', '--follow'], { env: sandbox.env, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     child.stdout.on('data', (chunk: Buffer) => (out += chunk.toString()));
+    const closed = new Promise<void>((resolve) => child.once('close', () => resolve()));
     try {
       await waitFor(() => out.includes('cmd: project cli logs --follow'));
       await sandbox.cli(['list']);
       await waitFor(() => out.includes('cmd: project list'));
     } finally {
       child.kill();
+      // Gone before the sandbox is removed: on Windows the log file stays locked while the process lives.
+      await Promise.race([closed, new Promise((resolve) => setTimeout(resolve, 30_000))]);
     }
   });
 
@@ -372,7 +375,7 @@ describe('end-to-end: labels', () => {
   beforeAll(() => {
     sandbox = makeSandbox();
   });
-  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+  afterAll(() => removeTempDir(sandbox.root));
 
   const names = async (...selectors: string[]): Promise<string[]> => {
     const result = await sandbox.cli(['list', '--json', ...selectors.flatMap((s) => ['--label', s])]);
@@ -437,7 +440,7 @@ describe('end-to-end: label wildcards in filters', () => {
     await sandbox.cli(['add', sandbox.dir('blog'), '--label', 'state::temp', '--label', 'env::sandbox']);
     await sandbox.cli(['add', sandbox.dir('notes')]);
   });
-  afterAll(() => rmSync(sandbox.root, { recursive: true, force: true }));
+  afterAll(() => removeTempDir(sandbox.root));
 
   const names = async (...selectors: string[]): Promise<string[]> => {
     const result = await sandbox.cli(['list', '--json', ...selectors.flatMap((s) => ['--label', s])]);
@@ -479,7 +482,7 @@ describe('end-to-end: a development build never starts the background update', (
     // A stand-in for project-updater.cjs, next to a stand-in for project.cjs (the launcher tells the CLI where its bundle is).
     writeFileSync(join(root, 'project-updater.cjs'), `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran');\n`);
   });
-  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  afterAll(() => removeTempDir(root));
 
   const waitForMarker = async (): Promise<boolean> => {
     for (let i = 0; i < 40; i++) {
@@ -505,7 +508,7 @@ describe('end-to-end: a development build never starts the background update', (
       expect(result.code, result.stderr).toBe(0);
       expect(await waitForMarker()).toBe(false);
     } finally {
-      rmSync(sandbox.root, { recursive: true, force: true });
+      removeTempDir(sandbox.root);
     }
   });
 });

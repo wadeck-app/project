@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { appModuleManifestCandidates, resolveAppModuleManifest } from './appModuleManifest.js';
+import { removeTempDir } from './testHelpers.js';
 
 let root: string;
 // Mimics both layouts: <root>/packages/project-cli/<base> is where the code runs.
@@ -20,7 +21,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  fs.rmSync(root, { recursive: true, force: true });
+  removeTempDir(root);
 });
 
 describe('resolveAppModuleManifest', () => {

@@ -1,11 +1,11 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { isolatedCliEnv, realGlobalInstallSnapshot, realLogMentions } from './testHelpers.js';
+import { isolatedCliEnv, realGlobalInstallSnapshot, realLogMentions, removeTempDir } from './testHelpers.js';
 
 const entry = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'main.js');
 
@@ -15,7 +15,7 @@ describe('isolatedCliEnv', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'project-cli-isolated-'));
   });
-  afterEach(() => rmSync(root, { recursive: true, force: true }));
+  afterEach(() => removeTempDir(root));
 
   it('points the registry, the home, the global npm prefix and the npm registry away from the real ones', () => {
     const env = isolatedCliEnv(root);
@@ -43,7 +43,7 @@ describe('the commands that update or roll back never touch the real installatio
     }
     root = mkdtempSync(join(tmpdir(), 'project-cli-isolated-'));
   });
-  afterEach(() => rmSync(root, { recursive: true, force: true }));
+  afterEach(() => removeTempDir(root));
 
   const cli = (...args: string[]) => spawnSync(process.execPath, [entry, ...args], { env: isolatedCliEnv(root), encoding: 'utf8' });
 
@@ -77,7 +77,7 @@ describe('isolatedCliEnv and the scoped registry', () => {
       const env = isolatedCliEnv(root);
       expect(env['npm_config_@wadeck-app:registry']).toBe(env['npm_config_registry']);
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      removeTempDir(root);
     }
   });
 });

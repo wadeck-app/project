@@ -1,8 +1,9 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openInvocationLog } from './invocationLog.js';
+import { removeTempDir } from './testHelpers.js';
 
 interface Entry {
   ts: string;
@@ -18,7 +19,7 @@ describe('openInvocationLog', () => {
     dir = mkdtempSync(join(tmpdir(), 'project-cli-log-'));
     warnings = [];
   });
-  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+  afterEach(() => removeTempDir(dir));
 
   const file = () => join(dir, 'logs', `${new Date().toISOString().slice(0, 10)}.ndjson`);
   const entries = (): Entry[] =>

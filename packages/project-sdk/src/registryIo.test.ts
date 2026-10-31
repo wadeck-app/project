@@ -15,7 +15,7 @@ describe('registry files', () => {
   });
 
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   it('names the files inside the registry directory', () => {

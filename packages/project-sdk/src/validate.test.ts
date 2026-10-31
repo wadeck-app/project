@@ -21,7 +21,7 @@ describe('validateRegistry', () => {
   });
 
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   it('accepts an empty registry and a coherent one', () => {

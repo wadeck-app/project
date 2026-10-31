@@ -1,11 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { isolatedCliEnv } from './testHelpers.js';
+import { bashCommand, isolatedCliEnv, removeTempDir, significantStderr } from './testHelpers.js';
 
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = join(packageDir, '..', '..');
@@ -29,7 +29,7 @@ function runBundleScript(env: NodeJS.ProcessEnv): Outcome {
 // and "autoUpdate: false" (written by isolatedCliEnv) keeps it from ever installing anything.
 const sandbox = mkdtempSync(join(tmpdir(), 'project-cli-dist-env-'));
 const isolatedEnv = isolatedCliEnv(sandbox);
-afterAll(() => rmSync(sandbox, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
+afterAll(() => removeTempDir(sandbox));
 
 /** Every file under a folder, relative and with forward slashes, sorted. */
 function filesUnder(dir: string, prefix = ''): string[] {
@@ -71,7 +71,8 @@ describe('the bundle (ci/scripts/bundle.ts)', () => {
 
   it('builds project.cjs and project-updater.cjs stamped with the version', () => {
     const built = runBundleScript({ BUNDLE_VERSION: STAMP });
-    expect(built.stderr).toBe('');
+    // npm prints its own warnings on the runner (setup-node writes an npmrc with an unknown key): only real errors count.
+    expect(significantStderr(built.stderr)).toBe('');
     expect(built.status).toBe(0);
     expect(existsSync(join(bundleDir, 'project.cjs'))).toBe(true);
     expect(existsSync(join(bundleDir, 'project-updater.cjs'))).toBe(true);
@@ -141,7 +142,7 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
   let root: string;
 
   function bash(script: string, args: string[] = []): Outcome {
-    const result = spawnSync('bash', [join(packageDir, 'ci', 'scripts', script).replace(/\\/g, '/'), ...args], { cwd: root, encoding: 'utf8' });
+    const result = spawnSync(bashCommand(), [join(packageDir, 'ci', 'scripts', script).replace(/\\/g, '/'), ...args], { cwd: root, encoding: 'utf8' });
     return { status: result.status, stdout: result.stdout, stderr: result.stderr };
   }
 
@@ -166,7 +167,7 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
     cpSync(join(packageDir, 'README.md'), join(cli, 'README.md'));
   });
 
-  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  afterAll(() => removeTempDir(root));
 
   it('generates the dist package under the published name, and the 3 platform packages', () => {
     // The extra after ':' puts the app-module folder in the files of the dist package.

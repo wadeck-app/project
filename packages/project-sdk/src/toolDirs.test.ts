@@ -27,7 +27,7 @@ describe('projectToolDir', () => {
   });
 
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   it('builds <registryDir>/projects/<id>/<tool>/<kind> without creating it by default', () => {
@@ -114,7 +114,7 @@ describe('projectToolDir kinds', () => {
       expect(existsSync(projectToolDir(root, '3fa9c1d2', 'flow', 'cache', { ensure: true }))).toBe(true);
       expect(existsSync(projectToolDir(root, '3fa9c1d2', 'flow', 'logs', { ensure: true }))).toBe(true);
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
     }
   });
 });

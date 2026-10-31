@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { removeTempDir } from './testHelpers.js';
 
 const script = join(dirname(fileURLToPath(import.meta.url)), '..', 'ci', 'scripts', 'annotate-failure.mjs');
 
@@ -12,7 +13,7 @@ describe('ci/scripts/annotate-failure.mjs', () => {
   beforeEach(() => {
     work = mkdtempSync(join(tmpdir(), 'project-cli-annotate-'));
   });
-  afterEach(() => rmSync(work, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
+  afterEach(() => removeTempDir(work));
 
   const run = (title: string, file: string) => spawnSync(process.execPath, [script, title, file], { encoding: 'utf8' });
   const log = (text: string): string => {

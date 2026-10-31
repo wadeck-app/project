@@ -31,6 +31,19 @@ export function makeWorkspace(): Workspace {
       mkdirSync(path, { recursive: true });
       return normalizePath(path);
     },
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }),
   };
+}
+
+// Lines that npm and node print on their own, whatever the code under test does (`npm warn ...` from the npmrc of setup-node, deprecation
+// and experimental warnings, the debugger). Same rule as significantStderr of project-cli (the packages do not share test helpers).
+const NOISE = [/^npm warn(\s|$)/, /^\(node:\d+\) /, /^\(Use `node --trace-/, /^Debugger attached/, /^Waiting for the debugger/, /^Debugger listening/];
+
+/** The stderr of a child process without the noise of npm and node: real errors are kept as they are. */
+export function significantStderr(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .filter((line) => !NOISE.some((pattern) => pattern.test(line)))
+    .join('\n')
+    .replace(/\s+$/, '');
 }

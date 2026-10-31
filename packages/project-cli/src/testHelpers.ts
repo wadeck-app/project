@@ -25,7 +25,7 @@ export interface Harness {
 /** Test-only (excluded from the build): a real temporary registry and work folders; call cleanup() in afterEach. */
 export function makeHarness(): Harness {
   // Real path on purpose: on macOS the temporary directory is a symlink (/var -> /private/var).
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'project-cli-ws-')));
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'project-cli-ws-')));
   const workRoot = join(root, 'work');
   mkdirSync(workRoot, { recursive: true });
   const env: NodeJS.ProcessEnv = { XDG_CONFIG_HOME: join(root, 'xdg') };
@@ -43,7 +43,7 @@ export function makeHarness(): Harness {
       const code = await run(argv, { out: (line) => out.push(line), err: (line) => err.push(line) }, { ...env, ...options.env }, options.cwd ?? workRoot);
       return { code, out: out.join('\n'), err: err.join('\n') };
     },
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    cleanup: () => removeTempDir(root),
   };
 }
 
@@ -63,6 +63,8 @@ export function isolatedCliEnv(root: string): NodeJS.ProcessEnv {
     XDG_CONFIG_HOME: join(root, 'xdg'),
     HOME: join(root, 'home'),
     USERPROFILE: join(root, 'home'),
+    // Windows keeps per-user settings (npm, caches) under these: the real ones must not be reachable either.
+    ...(process.platform === 'win32' ? { APPDATA: join(root, 'home', 'AppData', 'Roaming'), LOCALAPPDATA: join(root, 'home', 'AppData', 'Local') } : {}),
     npm_config_prefix: join(root, 'npm-prefix'),
     npm_config_registry: 'http://127.0.0.1:9/',
     // A scoped registry in the real .npmrc beats the plain one for @wadeck-app packages: pin the scope too.
@@ -88,4 +90,53 @@ export function realLogMentions(token: string): boolean {
     const file = join(configDir, 'logs', `${day}.ndjson`);
     return existsSync(file) && readFileSync(file, 'utf8').includes(token);
   });
+}
+
+// Lines that npm and node print on their own, whatever the code under test does: `npm warn ...` (setup-node writes an npmrc with keys
+// the installed npm does not know, "Unknown user config"), deprecation / experimental warnings of node and the debugger.
+const NOISE = [/^npm warn(\s|$)/, /^\(node:\d+\) /, /^\(Use `node --trace-/, /^Debugger attached/, /^Waiting for the debugger/, /^Debugger listening/];
+
+/** The stderr of a child process without the noise of npm and node: real errors and the output of the code under test are kept as they are. */
+export function significantStderr(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .filter((line) => !NOISE.some((pattern) => pattern.test(line)))
+    .join('\n')
+    .replace(/\s+$/, '');
+}
+
+/**
+ * Removes a temp folder at the end of a test. Windows (and antivirus) can refuse for a moment while a handle is still open (EPERM,
+ * EBUSY): the removal retries 20 times, 100 ms apart. A folder that still cannot be removed is a warning with its name, never a failed test.
+ */
+export function removeTempDir(
+  dir: string,
+  options: { remove?: (path: string, options: { recursive: boolean; force: boolean; maxRetries: number; retryDelay: number }) => void; warn?: (text: string) => void } = {},
+): void {
+  const { remove = rmSync, warn = (text: string) => void process.stderr.write(text) } = options;
+  try {
+    remove(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  } catch (error) {
+    warn(`[tests] could not remove the temp folder ${dir} (${error instanceof Error ? error.message : String(error)}); delete it by hand\n`);
+  }
+}
+
+/**
+ * The bash the tests run the ci scripts with. On a Windows machine `bash` can be the launcher of WSL (C:\Windows\System32\bash.exe, no
+ * distribution installed on a CI runner) found before the bash of Git: the scripts need the latter (cygpath, MSYS paths). Elsewhere: `bash`.
+ */
+export function bashCommand(platform: string = process.platform, env: NodeJS.ProcessEnv = process.env, exists: (path: string) => boolean = existsSync): string {
+  if (platform !== 'win32') {
+    return 'bash';
+  }
+  const roots = [env['ProgramFiles'], env['ProgramW6432'], env['ProgramFiles(x86)']].filter((root): root is string => root !== undefined && root !== '');
+  for (const root of roots) {
+    for (const relative of [['Git', 'bin', 'bash.exe'], ['Git', 'usr', 'bin', 'bash.exe']]) {
+      const candidate = join(root, ...relative);
+      if (exists(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  return 'bash';
 }

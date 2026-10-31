@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { devBuildRefusalMessage } from '@wadeck-app/shared-cli/ReleaseVersion';
-import { type Harness, makeHarness } from '../testHelpers.js';
+import { type Harness, makeHarness, removeTempDir } from '../testHelpers.js';
 
 const meta = vi.hoisted(() => ({
   cliVersionCommand: vi.fn(async () => undefined),
@@ -35,7 +35,7 @@ describe('project cli ...', () => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
-    rmSync(bundleDir, { recursive: true, force: true });
+    removeTempDir(bundleDir);
     h.cleanup();
   });
 

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { significantStderr } from './testHelpers.js';
 import { loadRegistry } from './registryIo.js';
 import { validateRegistry } from './validate.js';
 
@@ -42,7 +43,7 @@ describe('concurrent writers in separate processes', () => {
   });
 
   afterEach(() => {
-    rmSync(root, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   it('keeps every project when two processes add 20 projects each, while a third reads without lock', async () => {
@@ -53,7 +54,7 @@ describe('concurrent writers in separate processes', () => {
     ]);
 
     for (const result of [a, b, reader]) {
-      expect(result.stderr).toBe('');
+      expect(significantStderr(result.stderr)).toBe('');
       expect(result.code).toBe(0);
     }
     const registry = loadRegistry(registryDir);

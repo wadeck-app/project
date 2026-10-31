@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { currentVersion, readVersion } from './version.js';
+import { removeTempDir } from './testHelpers.js';
 
 describe('readVersion', () => {
   let dir: string;
@@ -11,7 +12,7 @@ describe('readVersion', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'project-cli-version-'));
   });
-  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+  afterEach(() => removeTempDir(dir));
 
   function fileWith(content: string): URL {
     const file = join(dir, 'package.json');

@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerWithAppCore } from './AppCoreRegistration.js';
 import { readAppModuleVersion, registerAfterUpdate } from './registerAfterUpdate.js';
+import { removeTempDir } from './testHelpers.js';
 
 const sdk = vi.hoisted(() => ({
   registerModule: vi.fn(),
@@ -38,7 +39,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  fs.rmSync(installDir, { recursive: true, force: true });
+  removeTempDir(installDir);
 });
 
 describe('readAppModuleVersion', () => {
@@ -146,7 +147,7 @@ describe('registerAfterUpdate with the real registration (staging)', () => {
     expect(fs.existsSync(staged('2'))).toBe(true);
     expect(fs.existsSync(staged('1'))).toBe(false);
     // Uninstall: the path app-core remembers is still there.
-    fs.rmSync(path.join(installDir, 'app-module'), { recursive: true, force: true });
+    removeTempDir(path.join(installDir, 'app-module'));
     expect(fs.existsSync(staged('2'))).toBe(true);
   });
 

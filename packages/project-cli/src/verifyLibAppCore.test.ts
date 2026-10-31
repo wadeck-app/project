@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { bashCommand, removeTempDir } from './testHelpers.js';
 
 const slashes = (path: string): string => path.replace(/\\/g, '/');
 const scripts = slashes(join(dirname(fileURLToPath(import.meta.url)), '..', 'ci', 'scripts'));
@@ -15,10 +16,10 @@ describe('ci/scripts/verify-lib.sh: helpers for the app-module check', () => {
   beforeEach(() => {
     work = mkdtempSync(join(tmpdir(), 'project-cli-verifylib-appcore-'));
   });
-  afterEach(() => rmSync(work, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
+  afterEach(() => removeTempDir(work));
 
   const bash = (script: string) =>
-    spawnSync('bash', ['-c', `source ${scripts}/verify-lib.sh; ${script}`], { encoding: 'utf8', env: { ...process.env, VERIFY_ROOT: slashes(work) } });
+    spawnSync(bashCommand(), ['-c', `source ${scripts}/verify-lib.sh; ${script}`], { encoding: 'utf8', env: { ...process.env, VERIFY_ROOT: slashes(work) } });
 
   it('isolate_env gives app-core a config folder of its own in the temp root (a registration must never reach the real one)', () => {
     const result = bash('isolate_env; echo "$APP_CORE_CONFIG_DIR"; test -d "$APP_CORE_CONFIG_DIR" && echo exists');
