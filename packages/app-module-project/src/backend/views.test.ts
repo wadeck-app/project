@@ -48,6 +48,20 @@ function collect(node: unknown, key: string, found: unknown[] = []): unknown[] {
   return found;
 }
 
+/** Every Form node, at any depth. */
+function findForms(node: unknown, found: Record<string, unknown>[] = []): Record<string, unknown>[] {
+  if (Array.isArray(node)) {
+    node.forEach((child) => findForms(child, found));
+  } else if (node !== null && typeof node === 'object') {
+    const record = node as Record<string, unknown>;
+    if (record['$type'] === 'Form') {
+      found.push(record);
+    }
+    Object.values(record).forEach((child) => findForms(child, found));
+  }
+  return found;
+}
+
 describe('manifest.json', () => {
   it('has the id project, no version (the packaging stamps it), no dslLib and no backend path (the packaging fixes it)', () => {
     expect(manifest.id).toBe('project');
@@ -163,6 +177,16 @@ describe('dsl-views', () => {
       if (action.url.startsWith('DELETE ')) {
         expect(action.confirm, `${file} ${name} is a DELETE: it must have a confirm`).toEqual(expect.any(String));
       }
+    }
+  });
+
+  // ButtonSave stays disabled ("No changes to save") until a field changes: a form without fields could never be submitted (seen in a browser).
+  it.each(viewFiles)('%s: a form without fields submits with a ButtonAction, not a ButtonSave', (file) => {
+    const forms = collect(parseView(file), '$type').length === 0 ? [] : findForms(parseView(file));
+    for (const form of forms.filter((f) => Array.isArray(f['fields']) && (f['fields'] as unknown[]).length === 0)) {
+      const types = ((form['actions'] ?? []) as { $type: string }[]).map((a) => a.$type);
+      expect(types, JSON.stringify(form['onSubmit'])).not.toContain('ButtonSave');
+      expect(types).toContain('ButtonAction');
     }
   });
 

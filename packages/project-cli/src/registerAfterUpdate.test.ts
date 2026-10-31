@@ -65,7 +65,7 @@ describe('readAppModuleVersion', () => {
 describe('registerAfterUpdate', () => {
   it('registers when the installed app-module version changed during the update', async () => {
     writeManifest(JSON.stringify({ version: '2' }));
-    await registerAfterUpdate({ manifestPath, before: { version: '1' }, register, log });
+    await registerAfterUpdate({ registered: true, manifestPath, before: { version: '1' }, register, log });
     expect(register).toHaveBeenCalledTimes(1);
     expect(register.mock.calls[0]![0]).toBe(manifestPath);
   });
@@ -80,38 +80,38 @@ describe('registerAfterUpdate', () => {
         });
       }
     );
-    await registerAfterUpdate({ manifestPath, before: { version: '1' }, register, log });
+    await registerAfterUpdate({ registered: true, manifestPath, before: { version: '1' }, register, log });
     expect(lines).toEqual(['app-core: module "project" registered (app-core on port 4850)']);
   });
 
   it('registers when the install gained an app-module it did not have before', async () => {
     writeManifest(JSON.stringify({ version: '1' }));
-    await registerAfterUpdate({ manifestPath, before: { absent: true }, register, log });
+    await registerAfterUpdate({ registered: true, manifestPath, before: { absent: true }, register, log });
     expect(register).toHaveBeenCalledTimes(1);
   });
 
   it('does nothing, and says nothing, when the version did not change (already up to date)', async () => {
     writeManifest(JSON.stringify({ version: '1' }));
-    await registerAfterUpdate({ manifestPath, before: { version: '1' }, register, log });
+    await registerAfterUpdate({ registered: true, manifestPath, before: { version: '1' }, register, log });
     expect(register).not.toHaveBeenCalled();
     expect(lines).toEqual([]);
   });
 
   it('says nothing when there is no app-module before or after', async () => {
-    await registerAfterUpdate({ manifestPath, before: { absent: true }, register, log });
+    await registerAfterUpdate({ registered: true, manifestPath, before: { absent: true }, register, log });
     expect(register).not.toHaveBeenCalled();
     expect(lines).toEqual([]);
   });
 
   it('warns when the app-module disappeared from the install', async () => {
-    await registerAfterUpdate({ manifestPath, before: { version: '1' }, register, log });
+    await registerAfterUpdate({ registered: true, manifestPath, before: { version: '1' }, register, log });
     expect(register).not.toHaveBeenCalled();
     expect(lines.join('\n')).toContain('no longer');
   });
 
   it('warns, with the reason and the manual fix, when the new manifest cannot be read', async () => {
     writeManifest('{not json');
-    await registerAfterUpdate({ manifestPath, before: { version: '1' }, register, log });
+    await registerAfterUpdate({ registered: true, manifestPath, before: { version: '1' }, register, log });
     expect(register).not.toHaveBeenCalled();
     expect(lines.join('\n')).toContain('manifest.json');
     expect(lines.join('\n')).toContain('project cli register');
@@ -138,9 +138,9 @@ describe('registerAfterUpdate with the real registration (staging)', () => {
     sdk.registerModule.mockResolvedValue({ status: 'registered' });
 
     writeManifest(JSON.stringify({ version: '1' }));
-    await registerAfterUpdate({ manifestPath, before: { absent: true }, register: registerWithAppCore, log });
+    await registerAfterUpdate({ registered: true, manifestPath, before: { absent: true }, register: registerWithAppCore, log });
     writeManifest(JSON.stringify({ version: '2' }));
-    await registerAfterUpdate({ manifestPath, before: { version: '1' }, register: registerWithAppCore, log });
+    await registerAfterUpdate({ registered: true, manifestPath, before: { version: '1' }, register: registerWithAppCore, log });
 
     expect(sdk.registerModule).toHaveBeenLastCalledWith({ id: 'project', manifestPath: staged('2') });
     expect(fs.existsSync(staged('2'))).toBe(true);
@@ -155,9 +155,41 @@ describe('registerAfterUpdate with the real registration (staging)', () => {
     // A file where the registry folder should be.
     fs.writeFileSync(path.join(installDir, 'xdg'), 'x');
     await expect(
-      registerAfterUpdate({ manifestPath, before: { absent: true }, register: registerWithAppCore, log })
+      registerAfterUpdate({ registered: true, manifestPath, before: { absent: true }, register: registerWithAppCore, log })
     ).resolves.toBeUndefined();
     expect(sdk.registerModule).not.toHaveBeenCalled();
     expect(lines.join('\n')).toContain('project cli register');
+  });
+});
+
+describe('registerAfterUpdate: only an app-module that was registered before is re-registered', () => {
+  it('registers nothing on a first install, and says how to register (not that anything was registered)', async () => {
+    writeManifest(JSON.stringify({ version: '2' }));
+    await registerAfterUpdate({ registered: false, manifestPath, before: { absent: true }, register, log });
+    expect(register).not.toHaveBeenCalled();
+    const text = lines.join('\n');
+    expect(text).toContain('project cli register');
+    expect(text).toContain('not registered');
+    expect(text).not.toMatch(/was registered|registered the/);
+  });
+
+  it('registers nothing either when the version changed but the module was never registered', async () => {
+    writeManifest(JSON.stringify({ version: '2' }));
+    await registerAfterUpdate({ registered: false, manifestPath, before: { version: '1' }, register, log });
+    expect(register).not.toHaveBeenCalled();
+    expect(lines.join('\n')).toContain('project cli register');
+  });
+
+  it('says nothing when nothing changed, registered or not', async () => {
+    writeManifest(JSON.stringify({ version: '1' }));
+    await registerAfterUpdate({ registered: false, manifestPath, before: { version: '1' }, register, log });
+    expect(register).not.toHaveBeenCalled();
+    expect(lines).toEqual([]);
+  });
+
+  it('re-registers an app-module that was registered before when its version changed', async () => {
+    writeManifest(JSON.stringify({ version: '2' }));
+    await registerAfterUpdate({ registered: true, manifestPath, before: { version: '1' }, register, log });
+    expect(register).toHaveBeenCalledTimes(1);
   });
 });

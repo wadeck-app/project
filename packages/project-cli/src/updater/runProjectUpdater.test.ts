@@ -22,7 +22,7 @@ function makeDeps(overrides: Partial<UpdaterDeps> = {}) {
     stdout: (line) => out.push(line),
     stderr: (line) => err.push(line),
     // These tests are about the update itself: no app-module in the install.
-    appModule: { readVersion: () => ({ absent: true }), register: async () => undefined },
+    appModule: { readVersion: () => ({ absent: true }), register: async () => undefined, isRegistered: () => false },
     ...overrides,
   };
   return { deps, out, err, writtenStates };

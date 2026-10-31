@@ -269,3 +269,16 @@ export class RestoreConflictError extends ProjectError {
     this.conflictsWith = details.conflictsWith;
   }
 }
+
+/** An answer to the "related items" request that breaks the contract (see parseRelatedResponse). */
+export class InvalidRelatedResponseError extends ProjectError {
+  /** Where in the answer: `title`, `items[2].url`, `$` for the answer itself. */
+  readonly path: string;
+  readonly reason: string;
+
+  constructor(message: string, details: { path: string; reason: string }) {
+    super('INVALID_RELATED_RESPONSE', message);
+    this.path = details.path;
+    this.reason = details.reason;
+  }
+}

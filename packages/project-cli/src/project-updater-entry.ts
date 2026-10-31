@@ -2,6 +2,7 @@
 import { defaultRegistryDir } from '@wadeck-app/project-sdk';
 import { cacheFilePath, execNpm, readCache, readState, runUpdater, stateFilePath, writeState } from '@wadeck-app/shared-updater';
 import { registerWithAppCore } from './AppCoreRegistration.js';
+import { hasStagedModule } from './appModuleStaging.js';
 import { readAppModuleVersion } from './registerAfterUpdate.js';
 import { runProjectUpdater } from './updater/runProjectUpdater.js';
 
@@ -33,7 +34,7 @@ runProjectUpdater({
   now: () => Date.now(),
   stdout: (line) => process.stdout.write(`${line}\n`),
   stderr: (line) => process.stderr.write(`${line}\n`),
-  appModule: { readVersion: readAppModuleVersion, register: registerWithAppCore },
+  appModule: { readVersion: readAppModuleVersion, register: registerWithAppCore, isRegistered: () => hasStagedModule(configDir) },
 }).then((code) => {
   process.exitCode = code;
 });

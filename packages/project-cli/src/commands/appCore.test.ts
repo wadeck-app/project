@@ -83,6 +83,12 @@ describe('project cli register | unregister', () => {
     });
   });
 
+  it('the help says that the first registration is explicit and that only this command does it', async () => {
+    const result = await h.cli(['--help']);
+    expect(result.out).toContain('first registration');
+    expect(result.out).toContain('only this command');
+  });
+
   it('both commands are in the help of the cli group', async () => {
     const result = await h.cli(['--help']);
     expect(result.out).toContain('cli register');

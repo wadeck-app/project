@@ -11,6 +11,8 @@ export const PKG_NAME = '@wadeck-app/project-cli';
 export interface AppModuleDeps {
   readVersion: (manifestPath: string) => AppModuleVersion;
   register: (manifestPath: string, log: (entry: { source: string; message: string }) => void) => Promise<void>;
+  /** Whether the user registered the module (a staged copy exists). Read before the install. */
+  isRegistered: () => boolean;
 }
 
 /** Everything the updater touches outside its own logic, so it can be run against fakes. */
@@ -105,9 +107,11 @@ function prepareAppModule(deps: UpdaterDeps): () => Promise<void> {
     return unknown(`the global npm folder is unknown (${error instanceof Error ? error.message : String(error)})`);
   }
   const before = deps.appModule.readVersion(manifestPath);
+  const registered = deps.appModule.isRegistered();
   return async () => {
     try {
       await registerAfterUpdate({
+        registered,
         manifestPath,
         before,
         readVersion: deps.appModule.readVersion,

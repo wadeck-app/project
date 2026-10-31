@@ -3,6 +3,8 @@ import * as fs from 'node:fs';
 export type AppModuleVersion = { version: string } | { absent: true } | { error: string };
 
 export interface RegisterAfterUpdateDeps {
+  /** Whether the user registered the module before this update (see hasStagedModule). Never registered: the update registers nothing. */
+  registered: boolean;
   /** manifest.json of the app-module inside the installed package. */
   manifestPath: string;
   /** What `readAppModuleVersion` returned BEFORE the updater ran. */
@@ -53,6 +55,13 @@ export async function registerAfterUpdate(deps: RegisterAfterUpdateDeps): Promis
     return;
   }
   if ('version' in deps.before && deps.before.version === after.version) {
+    return;
+  }
+  // The first registration is explicit (`project cli register`): an update only keeps a registration that exists.
+  if (!deps.registered) {
+    deps.log(
+      'app-core: the project pages are not registered with app-core, so this update does not register them. To show them in app-core, run once: project cli register'
+    );
     return;
   }
   // The SDK messages already start with "app-core:": print them as they are.

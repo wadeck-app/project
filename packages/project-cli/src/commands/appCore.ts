@@ -18,7 +18,7 @@ function outputOf(attempt: AppCoreAttempt): CommandOutput {
 
 export const registerCommand: PlainCommand = {
   name: 'cli register',
-  summary: 'Tell app-core where the project pages are (also reloads them after an update; the updater does it for you)',
+  summary: 'Show the project pages in app-core. This is the first registration: only this command does it; updates then keep it current',
   target: 'none',
   args: [],
   options: {},
@@ -35,7 +35,7 @@ export const registerCommand: PlainCommand = {
 
 export const unregisterCommand: PlainCommand = {
   name: 'cli unregister',
-  summary: 'Remove the project pages from app-core',
+  summary: 'Remove the project pages from app-core, and stop the updates from registering them again',
   target: 'none',
   args: [],
   options: {},

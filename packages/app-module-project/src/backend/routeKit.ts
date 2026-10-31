@@ -1,11 +1,13 @@
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
 import { toHttpError } from './httpError.js';
+import { assertWriteAllowed } from './writeGuard.js';
 
 /** The parts of a Fastify request the routes read (the SDK types them loosely). */
 export interface RouteRequest {
   params?: Record<string, string>;
   query?: Record<string, string | string[] | undefined>;
   body?: unknown;
+  headers?: Record<string, string | string[] | undefined>;
 }
 
 /** What a route returns: the HTTP status and the JSON body. */
@@ -39,6 +41,8 @@ export function createRouteKit(ctx: ModuleContext, writeStderr: (text: string) =
         const out = reply as unknown as Reply;
         const request = req as unknown as RouteRequest;
         try {
+          // Before anything else: a refused write never reaches the registry.
+          assertWriteAllowed(method, request.headers ?? {});
           const answer = await run(request);
           return out.code(answer.status).send(answer.body);
         } catch (error) {
@@ -48,7 +52,9 @@ export function createRouteKit(ctx: ModuleContext, writeStderr: (text: string) =
             const cause = error instanceof Error ? (error.stack ?? error.message) : String(error);
             writeStderr(`[project module] ${method} ${subPath} failed with ${failure.status}: ${cause}\n`);
           }
-          const answer = request.query?.['inlineErrors'] === 'true' ? inline(failure) : failure;
+          // Only a read is answered as data: a refused or failed change must be an error for the shell.
+          const asData = request.query?.['inlineErrors'] === 'true' && method.toUpperCase() === 'GET';
+          const answer = asData ? inline(failure) : failure;
           return out.code(answer.status).send(answer.body);
         }
       });

@@ -228,8 +228,10 @@ sections:
         initialData: $sources.detail.forms.empty
         fields: []
         actions:
-          - $type: ButtonSave
+          - $type: ButtonAction
             label: Clear the git url
+            variant: danger
+            type: submit
 
   - $type: Section
     $if: $sources.detail.project
@@ -272,8 +274,10 @@ sections:
         initialData: $sources.detail.forms.empty
         fields: []
         actions:
-          - $type: ButtonSave
+          - $type: ButtonAction
             label: Remove the parent
+            variant: danger
+            type: submit
 
   - $type: Section
     $if: $sources.detail.project
@@ -394,6 +398,7 @@ sections:
           - { key: 'module', label: 'Module', nowrap: true }
           - { key: 'title', label: 'What' }
           - { key: 'countText', label: 'Count', nowrap: true }
+          - { key: 'noteText', label: '', nowrap: true }
       - $type: DataTable
         $if: $sources.related.hasPanels
         rows: $sources.related.rows

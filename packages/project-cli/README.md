@@ -41,7 +41,7 @@ An update that cannot be verified is not attempted: if `npm root -g` fails, the 
 
 ## App-core pages
 
-The package ships the app-core module `project` (`app-module/`, built from `packages/app-module-project`): pages to browse and change the registry. `project cli register` copies it to `<registry folder>/app-module/<version>/` (the copy outlives npm replacing or removing the package; older copies are removed once app-core holds the new one) and registers that copy. The updater does the same after an update that changed the app-module.
+The package ships the app-core module `project` (`app-module/`, built from `packages/app-module-project`): pages to browse and change the registry. `project cli register` copies it to `<registry folder>/app-module/<version>/` (the copy outlives npm replacing or removing the package; older copies are removed once app-core holds the new one) and registers that copy. **The first registration is explicit**: only `project cli register` does it, an install or an update never registers the pages by itself. The staged copy is the sign that you registered: when it exists, an update that changed the app-module registers the new one (so a running app-core shows it); when it does not, the update only prints how to register. `project cli unregister` removes the staged copies, so updates stop registering the pages.
 
 | Outcome | Exit | Meaning |
 |---|---|---|

@@ -10,6 +10,7 @@ function makeDeps(versions: AppModuleVersion[], overrides: Partial<UpdaterDeps> 
   const out: string[] = [];
   const err: string[] = [];
   const register = vi.fn(async (_manifestPath: string, log: (entry: { source: string; message: string }) => void) => log({ source: 'x', message: 'app-core: module "project" registered' }));
+  const isRegistered = vi.fn(() => true);
   const readVersion = vi.fn(() => versions.shift() ?? ({ absent: true } as AppModuleVersion));
   const deps: UpdaterDeps = {
     env: {},
@@ -26,13 +27,32 @@ function makeDeps(versions: AppModuleVersion[], overrides: Partial<UpdaterDeps> 
     now: () => 5000,
     stdout: (line) => out.push(line),
     stderr: (line) => err.push(line),
-    appModule: { readVersion, register },
+    appModule: { readVersion, register, isRegistered },
     ...overrides,
   };
-  return { deps, out, err, register, readVersion };
+  return { deps, out, err, register, readVersion, isRegistered };
 }
 
 describe('runProjectUpdater: the app-module after an update', () => {
+  it('registers nothing when the module was never registered (the first registration is explicit) and says how to', async () => {
+    const { deps, register, out } = makeDeps([{ absent: true }, { version: '2' }]);
+    deps.appModule.isRegistered = () => false;
+    expect(await runProjectUpdater(deps)).toBe(0);
+    expect(register).not.toHaveBeenCalled();
+    expect(out.join('\n')).toContain('project cli register');
+  });
+
+  it('reads whether the module was registered BEFORE the install (an install must not create the signal)', async () => {
+    const order: string[] = [];
+    const { deps } = makeDeps([{ version: '1' }, { version: '2' }], { runUpdater: vi.fn(async () => void order.push('install')) });
+    deps.appModule.isRegistered = () => {
+      order.push('signal');
+      return true;
+    };
+    await runProjectUpdater(deps);
+    expect(order).toEqual(['signal', 'install']);
+  });
+
   it('tells app-core about the new pages when the installed app-module changed, and prints what app-core answered', async () => {
     const { deps, out, register } = makeDeps([{ version: '1' }, { version: '2' }]);
     expect(await runProjectUpdater(deps)).toBe(0);

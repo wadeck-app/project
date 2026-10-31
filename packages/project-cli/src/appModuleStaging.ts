@@ -112,3 +112,22 @@ export function pruneStagedModules(configDir: string, keepStamp: string): number
   }
   return removed;
 }
+
+/**
+ * True when a copy of the app-module was staged: `project cli register` did it (and nothing else does), `project cli unregister`
+ * removes it. It is the signal for "the user registered the pages in app-core": an update re-registers only then.
+ */
+export function hasStagedModule(configDir: string): boolean {
+  try {
+    return fs
+      .readdirSync(stagedModulesRoot(configDir), { withFileTypes: true })
+      .some((entry) => entry.isDirectory() && fs.existsSync(path.join(stagedModulesRoot(configDir), entry.name, 'manifest.json')));
+  } catch {
+    return false;
+  }
+}
+
+/** Removes every staged copy (and so the signal of hasStagedModule). Nothing to remove is not an error. */
+export function removeStagedModules(configDir: string): void {
+  fs.rmSync(stagedModulesRoot(configDir), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}

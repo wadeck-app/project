@@ -2,7 +2,7 @@ import type { ServerResponse } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { type Behavior, fakeAppCore, json } from './fakeAppCore.js';
 import { RequestError } from './httpError.js';
-import { collectRelated } from './related.js';
+import { NegativeCache, collectRelated } from './related.js';
 
 const panel = (title: string, extra: object = {}) => ({ title, count: 1, items: [{ label: 'one', url: '/modules/x/one' }], ...extra });
 
@@ -78,7 +78,7 @@ describe('collectRelated', () => {
   it('still rejects a wrong type of a known field when unknown fields are present', async () => {
     const app = await fakeAppCore(['flow'], { flow: (_req, res) => json(res, 200, { title: 'Flows', items: [], count: 'two', project: { name: 'shop' } }) });
     const panels = await collectRelated('0000abcd', { baseUrl: app.baseUrl });
-    expect(panels).toEqual([{ module: 'flow', error: expect.stringContaining("'count' must be a whole number") }]);
+    expect(panels).toEqual([{ module: 'flow', error: expect.stringContaining('at count') }]);
   });
 
   it.each([400, 502])('keeps a %i (malformed id, unreadable registry) as a visible warning with the status', async (status) => {
@@ -114,15 +114,15 @@ describe('collectRelated', () => {
   it.each([
     ['not JSON', (res: ServerResponse) => res.end('<html>'), 'is not JSON'],
     ['an array', (res: ServerResponse) => json(res, 200, []), 'must be an object'],
-    ['no title', (res: ServerResponse) => json(res, 200, { items: [] }), "'title' must be a non-empty text"],
-    ['no items', (res: ServerResponse) => json(res, 200, { title: 'T' }), "'items' must be a list"],
-    ['a bad count', (res: ServerResponse) => json(res, 200, { title: 'T', items: [], count: -1 }), "'count' must be a whole number"],
-    ['an item without label', (res: ServerResponse) => json(res, 200, { title: 'T', items: [{ url: '/modules/x' }] }), "items[0].label must be a non-empty text"],
-    ['an external url', (res: ServerResponse) => json(res, 200, { title: 'T', items: [{ label: 'x', url: 'https://evil.example/' }] }), "items[0].url must start with '/modules/'"],
-    ['a protocol-relative url', (res: ServerResponse) => json(res, 200, { title: 'T', items: [{ label: 'x', url: '//evil.example/' }] }), "items[0].url must start with '/modules/'"],
-    ['a script url', (res: ServerResponse) => json(res, 200, { title: 'T', items: [{ label: 'x', url: 'javascript:alert(1)' }] }), "items[0].url must start with '/modules/'"],
-    ['an external moreUrl', (res: ServerResponse) => json(res, 200, { title: 'T', items: [], moreUrl: 'http://evil.example' }), "'moreUrl' must start with '/modules/'"],
-    ['a bad subtitle', (res: ServerResponse) => json(res, 200, { title: 'T', items: [{ label: 'x', url: '/modules/x', subtitle: 3 }] }), 'items[0].subtitle must be a text'],
+    ['no title', (res: ServerResponse) => json(res, 200, { items: [] }), 'at title'],
+    ['no items', (res: ServerResponse) => json(res, 200, { title: 'T' }), 'at items'],
+    ['a bad count', (res: ServerResponse) => json(res, 200, { title: 'T', items: [], count: -1 }), 'at count'],
+    ['an item without label', (res: ServerResponse) => json(res, 200, { title: 'T', items: [{ url: '/modules/x' }] }), 'at items[0].label'],
+    ['an external url', (res: ServerResponse) => json(res, 200, { title: 'T', items: [{ label: 'x', url: 'https://evil.example/' }] }), 'at items[0].url'],
+    ['a protocol-relative url', (res: ServerResponse) => json(res, 200, { title: 'T', items: [{ label: 'x', url: '//evil.example/' }] }), 'at items[0].url'],
+    ['a script url', (res: ServerResponse) => json(res, 200, { title: 'T', items: [{ label: 'x', url: 'javascript:alert(1)' }] }), 'at items[0].url'],
+    ['an external moreUrl', (res: ServerResponse) => json(res, 200, { title: 'T', items: [], moreUrl: 'http://evil.example' }), 'at moreUrl'],
+    ['a bad subtitle', (res: ServerResponse) => json(res, 200, { title: 'T', items: [{ label: 'x', url: '/modules/x', subtitle: 3 }] }), 'at items[0].subtitle'],
   ])('refuses an invalid answer (%s) as a warning that says what is wrong, never shows it', async (_name, answer, reason) => {
     const app = await fakeAppCore(['odd'], { odd: (_req, res) => answer(res) });
     const panels = await collectRelated('0000abcd', { baseUrl: app.baseUrl });
@@ -140,5 +140,78 @@ describe('collectRelated', () => {
   it('is empty when no other module is installed', async () => {
     const app = await fakeAppCore(['project'], {});
     expect(await collectRelated('0000abcd', { baseUrl: app.baseUrl })).toEqual([]);
+  });
+});
+
+describe('collectRelated: the contract of the SDK', () => {
+  it('passes countLabel and truncated through (a short list of a long one)', async () => {
+    const app = await fakeAppCore(['task'], {
+      task: (_req, res) => json(res, 200, { title: 'Tasks', count: 3, countLabel: 'open', truncated: true, items: [], moreUrl: '/modules/task/tasks' }),
+    });
+    const [panel] = await collectRelated('0000abcd', { baseUrl: app.baseUrl });
+    expect(panel).toEqual({ module: 'task', title: 'Tasks', count: 3, countLabel: 'open', truncated: true, items: [], moreUrl: '/modules/task/tasks' });
+  });
+
+  it('refuses a protocol-relative moreUrl and an address hidden in a query (rules of isModuleUrl)', async () => {
+    const app = await fakeAppCore(['a', 'b'], {
+      a: (_req, res) => json(res, 200, { title: 'A', items: [], moreUrl: '//evil.example/modules/x' }),
+      b: (_req, res) => json(res, 200, { title: 'B', items: [{ label: 'x', url: '/modules/b?next=http://evil.example' }] }),
+    });
+    const panels = await collectRelated('0000abcd', { baseUrl: app.baseUrl });
+    expect(panels.map((p) => p.error)).toEqual([expect.stringContaining('at moreUrl'), expect.stringContaining('at items[0].url')]);
+  });
+});
+
+describe('collectRelated: the negative cache', () => {
+  let now = 0;
+  const clock = () => now;
+  const fresh = () => {
+    now = 1_000;
+    return new NegativeCache(clock);
+  };
+
+  it.each([404, 409])('does not ask again for 60 s a module that answered %i, then asks again', async (status) => {
+    const app = await fakeAppCore(['task'], { task: (_req, res) => json(res, status, {}) });
+    const cache = fresh();
+    await collectRelated('0000abcd', { baseUrl: app.baseUrl, cache });
+    await collectRelated('0000abcd', { baseUrl: app.baseUrl, cache });
+    expect(app.calls).toEqual(['task:0000abcd']);
+    now += 59_999;
+    await collectRelated('0000abcd', { baseUrl: app.baseUrl, cache });
+    expect(app.calls).toHaveLength(1);
+    now += 2;
+    await collectRelated('0000abcd', { baseUrl: app.baseUrl, cache });
+    expect(app.calls).toHaveLength(2);
+  });
+
+  it('is keyed by module AND project: another project, or another module, is asked', async () => {
+    const app = await fakeAppCore(['task', 'flow'], { task: (_req, res) => json(res, 404, {}), flow: (_req, res) => json(res, 200, panel('Flows')) });
+    const cache = fresh();
+    await collectRelated('0000abcd', { baseUrl: app.baseUrl, cache });
+    await collectRelated('1111aaaa', { baseUrl: app.baseUrl, cache });
+    expect(app.calls.filter((c) => c.startsWith('task'))).toEqual(['task:0000abcd', 'task:1111aaaa']);
+    // flow answered 200: never cached
+    expect(app.calls.filter((c) => c.startsWith('flow'))).toHaveLength(2);
+  });
+
+  it('never caches another outcome: a failure, a timeout, an invalid answer or a good one is asked again at once', async () => {
+    const app = await fakeAppCore(['boom', 'hang', 'odd'], {
+      boom: (_req, res) => json(res, 500, {}),
+      hang: () => undefined,
+      odd: (_req, res) => json(res, 200, { nope: true }),
+    });
+    const cache = fresh();
+    await collectRelated('0000abcd', { baseUrl: app.baseUrl, cache, timeoutMs: 300 });
+    await collectRelated('0000abcd', { baseUrl: app.baseUrl, cache, timeoutMs: 300 });
+    expect(app.calls.filter((c) => c.startsWith('boom'))).toHaveLength(2);
+    expect(app.calls.filter((c) => c.startsWith('hang'))).toHaveLength(2);
+    expect(app.calls.filter((c) => c.startsWith('odd'))).toHaveLength(2);
+  });
+
+  it('without a cache every request asks everyone', async () => {
+    const app = await fakeAppCore(['task'], { task: (_req, res) => json(res, 404, {}) });
+    await collectRelated('0000abcd', { baseUrl: app.baseUrl });
+    await collectRelated('0000abcd', { baseUrl: app.baseUrl });
+    expect(app.calls).toHaveLength(2);
   });
 });

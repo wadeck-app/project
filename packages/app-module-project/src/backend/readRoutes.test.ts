@@ -97,8 +97,9 @@ describe('GET /projects', () => {
     const module = makeModule();
     const names = async (q: string) => namesOf((await module.call('GET', `/projects?q=${encodeURIComponent(q)}`)).body.projects);
     expect(await names('SHOP')).toEqual(['shop']);
-    // The text is a part of the value: 'sh' is in the alias of shop and in the label 'shared' of base.
-    expect(await names('sh')).toEqual(['base', 'shop']);
+    // A part of a value: 'hared' is in the label 'shared' of base. Short queries may also hit the random name of the temp folder in the paths.
+    expect(await names('hared')).toEqual(['base']);
+    expect(await names('sh')).toContain('shop');
     expect(await names('store')).toEqual([]);
     expect(await names(shop.id.toUpperCase())).toEqual(['shop']);
     expect(await names('team::blue')).toEqual(['shop']);

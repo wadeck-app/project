@@ -247,3 +247,37 @@ describe('registerWithAppCore stages an installed module', () => {
     }
   });
 });
+
+describe('attemptUnregistration removes the staged copies (the signal of "registered")', () => {
+  let configRoot: string;
+  let savedXdg: string | undefined;
+  const stagedDir = (): string => path.join(configRoot, 'project', 'app-module', '1.0.0');
+
+  beforeEach(() => {
+    configRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'project-unreg-'));
+    savedXdg = process.env['XDG_CONFIG_HOME'];
+    process.env['XDG_CONFIG_HOME'] = configRoot;
+    fs.mkdirSync(stagedDir(), { recursive: true });
+    fs.writeFileSync(path.join(stagedDir(), 'manifest.json'), '{}');
+  });
+
+  afterEach(() => {
+    if (savedXdg === undefined) delete process.env['XDG_CONFIG_HOME'];
+    else process.env['XDG_CONFIG_HOME'] = savedXdg;
+    fs.rmSync(configRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  });
+
+  it.each(['unregistered', 'not-registered', 'cleared', 'skipped'])('after the outcome "%s"', async (status) => {
+    sdk.unregisterModule.mockResolvedValue({ status });
+    await attemptUnregistration();
+    expect(fs.existsSync(path.join(configRoot, 'project', 'app-module'))).toBe(false);
+  });
+
+  it('keeps them when app-core refused (it may still use the module) or the call failed', async () => {
+    sdk.unregisterModule.mockResolvedValue({ status: 'refused' });
+    await attemptUnregistration();
+    sdk.unregisterModule.mockRejectedValue(new Error('boom'));
+    await attemptUnregistration();
+    expect(fs.existsSync(stagedDir())).toBe(true);
+  });
+});

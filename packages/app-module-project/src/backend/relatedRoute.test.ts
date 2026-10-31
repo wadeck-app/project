@@ -24,13 +24,38 @@ describe('GET /projects/:ref/related', () => {
     expect(app.calls).toEqual([`task:${shop.id}`]);
     expect(body.projectId).toBe(shop.id);
     expect(body.panels).toEqual([{ module: 'task', title: 'Tasks', count: 2, items: expect.any(Array), moreUrl: '/modules/task/tasks?project=shop' }]);
-    expect(body.summary).toEqual([{ module: 'task', title: 'Tasks', countText: '2', href: '/modules/task/tasks?project=shop' }]);
+    expect(body.summary).toEqual([{ module: 'task', title: 'Tasks', countText: '2', noteText: '', href: '/modules/task/tasks?project=shop' }]);
     expect(body.rows).toEqual([
       { module: 'task', panel: 'Tasks', label: 'Fix it', subtitle: 'open', href: '/modules/task/tasks/a' },
       { module: 'task', panel: 'Tasks', label: 'Other', subtitle: '', href: '/modules/task/tasks/b' },
     ]);
     expect(body.warnings).toEqual([]);
     expect(body.hasPanels).toBe(true);
+  });
+
+  it('renders the count with its label ("3 open") and says when the list is partial', async () => {
+    await addProject(world.registryDir, { name: 'shop' });
+    const app = await fakeAppCore(['task', 'flow'], {
+      task: (_req, res) => json(res, 200, { title: 'Tasks', count: 3, countLabel: 'open', truncated: true, items: [{ label: 'a', url: '/modules/task/a' }], moreUrl: '/modules/task' }),
+      flow: (_req, res) => json(res, 200, { title: 'Flows', items: [{ label: 'f', url: '/modules/flow/f' }] }),
+    });
+    process.env['APP_CORE_PORT'] = new URL(app.baseUrl).port;
+    const { body } = await makeModule().call('GET', '/projects/shop/related');
+    expect(body.summary).toEqual([
+      { module: 'flow', title: 'Flows', countText: '1', noteText: '', href: '' },
+      { module: 'task', title: 'Tasks', countText: '3 open', noteText: 'partial list', href: '/modules/task' },
+    ]);
+  });
+
+  it('does not ask again for a minute a module that said it has nothing for this project (negative cache)', async () => {
+    await addProject(world.registryDir, { name: 'shop' });
+    const app = await fakeAppCore(['task'], { task: (_req, res) => json(res, 409, {}) });
+    process.env['APP_CORE_PORT'] = new URL(app.baseUrl).port;
+    const module = makeModule();
+    await module.call('GET', '/projects/shop/related');
+    const second = await module.call('GET', '/projects/shop/related');
+    expect(app.calls).toHaveLength(1);
+    expect(second.body.warnings).toEqual([]);
   });
 
   it('shows the failure of a module as a warning with its name, next to the panels of the others', async () => {

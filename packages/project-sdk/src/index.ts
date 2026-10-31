@@ -58,3 +58,4 @@ export {
   mergeLayers,
   validateLayer,
 } from './config.js';
+export { type RelatedItem, type RelatedPanel, assertRelatedResponse, buildRelatedResponse, isModuleUrl, parseRelatedResponse } from './related.js';

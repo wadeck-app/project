@@ -60,6 +60,12 @@ describe('ci/scripts/verify-lib.sh: helpers for the app-module check', () => {
     const update = readFileSync(join(scripts, 'verify-update.sh'), 'utf8');
     expect(update).toContain('pick_free_port');
     expect(update).toContain('modules/project.json');
+    // First registration explicit: the update alone registers nothing, a registered module is registered again by the next update.
+    expect(update).toContain('did NOT register');
+    expect(update).toContain('cli register --json');
+    expect(update).toContain('registers the app-module again');
+    expect(update.indexOf('(e2b)')).toBeLessThan(update.indexOf('(e2c)'));
+    expect(update.indexOf('(e2c)')).toBeLessThan(update.indexOf('(e4)'));
     expect(update.indexOf('pick_free_port')).toBeLessThan(update.indexOf('update_to "$VERSION"'));
   });
 

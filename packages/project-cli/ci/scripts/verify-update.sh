@@ -43,13 +43,20 @@ first_run
 ACTUAL="$(installed_version)"
 assert_equals "installed version" "$PREVIOUS" "$ACTUAL"
 
-# app-core is not running here: the updater must leave the new pages for its next start (deferred), not fail and not skip silently.
+# app-core is not running here: a registration is left for its next start (deferred), it neither fails nor is skipped silently.
 pick_free_port
 
 step "(e2) project cli update installs $VERSION"
 update_to "$VERSION"
 
-step "(e2b) the update told app-core about the app-module of $VERSION (deferred: app-core is not running)"
+step "(e2b) the update did NOT register the app-module: the first registration is explicit"
+[ ! -e "$XDG_CONFIG_HOME/project/app-module" ] || fail "the update staged the app-module although it was never registered ($XDG_CONFIG_HOME/project/app-module)"
+[ ! -e "$APP_CORE_CONFIG_DIR/modules/project.json" ] || fail "the update registered the app-module with app-core although it was never registered"
+echo "ok: nothing was registered by the update"
+
+step "(e2c) project cli register (app-core is not running: deferred)"
+run_project cli register --json || fail "project cli register exited with status $?"
+assert_contains "project cli register" "\"status\": \"deferred\"" "$(last_stdout)"
 assert_file "the staged copy of the app-module" "$XDG_CONFIG_HOME/project/app-module/$VERSION/manifest.json"
 assert_file "the pending registration for app-core" "$APP_CORE_CONFIG_DIR/modules/project.json"
 
@@ -58,9 +65,13 @@ run_project cli rollback || fail "project cli rollback exited with status $?"
 ACTUAL="$(installed_version)"
 assert_equals "installed version after the rollback" "$PREVIOUS" "$ACTUAL"
 
-step "(e4) project cli update installs $VERSION again"
+# The module was registered before: this update must register it again. The pending registration is removed to see it come back.
+rm -f "$APP_CORE_CONFIG_DIR/modules/project.json"
+
+step "(e4) project cli update installs $VERSION again, and registers the app-module again (it was registered)"
 update_to "$VERSION"
 assert_file "the staged copy of the app-module after the second update" "$XDG_CONFIG_HOME/project/app-module/$VERSION/manifest.json"
+assert_file "the pending registration for app-core, written by the update" "$APP_CORE_CONFIG_DIR/modules/project.json"
 
 echo
 echo "verify-update: all steps passed ($PREVIOUS -> $VERSION -> $PREVIOUS -> $VERSION) on $(uname -s)"

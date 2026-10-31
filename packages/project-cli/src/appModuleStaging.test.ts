@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { pruneStagedModules, stageAppModule, stagedModulesRoot } from './appModuleStaging.js';
+import { hasStagedModule, pruneStagedModules, removeStagedModules, stageAppModule, stagedModulesRoot } from './appModuleStaging.js';
 
 let root: string;
 let configDir: string;
@@ -107,5 +107,32 @@ describe('pruneStagedModules', () => {
 
   it('is 0 when nothing was ever staged', () => {
     expect(pruneStagedModules(configDir, '1.0.0')).toBe(0);
+  });
+});
+
+describe('the signal "this module was registered": a staged copy', () => {
+  it('is absent before any registration: no folder, an empty folder, a folder without manifest', () => {
+    const config = path.join(root, 'signal');
+    expect(hasStagedModule(config)).toBe(false);
+    fs.mkdirSync(path.join(config, 'app-module'), { recursive: true });
+    expect(hasStagedModule(config)).toBe(false);
+    fs.mkdirSync(path.join(config, 'app-module', '1.0.0'), { recursive: true });
+    expect(hasStagedModule(config)).toBe(false);
+  });
+
+  it('is present once a copy is staged, and gone once the copies are removed (unregister)', () => {
+    const config = path.join(root, 'signal2');
+    const src = path.join(root, 'npm', 'app-module');
+    fs.mkdirSync(src, { recursive: true });
+    fs.writeFileSync(path.join(src, 'manifest.json'), JSON.stringify({ version: '3.0.0' }));
+    stageAppModule(path.join(src, 'manifest.json'), config);
+    expect(hasStagedModule(config)).toBe(true);
+    removeStagedModules(config);
+    expect(hasStagedModule(config)).toBe(false);
+    expect(fs.existsSync(path.join(config, 'app-module'))).toBe(false);
+  });
+
+  it('removing when there is nothing is not an error', () => {
+    expect(() => removeStagedModules(path.join(root, 'never'))).not.toThrow();
   });
 });

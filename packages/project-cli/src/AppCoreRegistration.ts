@@ -1,7 +1,7 @@
 import { describeRegistration, registerModule, unregisterModule } from '@wadeck-app/app-core-sdk/register';
 import type { RegistrationOutcome, UnregistrationOutcome } from '@wadeck-app/app-core-sdk/register';
 import { defaultRegistryDir } from '@wadeck-app/project-sdk';
-import { isPackagedInstall, pruneStagedModules, stageAppModule } from './appModuleStaging.js';
+import { isPackagedInstall, pruneStagedModules, removeStagedModules, stageAppModule } from './appModuleStaging.js';
 import type { StagedModule } from './appModuleStaging.js';
 
 /** The module id app-core knows the project module by: the prefix of its components and routes. Must equal the id in app-module-project's manifest.json. */
@@ -90,14 +90,28 @@ export async function attemptStagedRegistration(
   return attempt;
 }
 
+/**
+ * Removes the staged copies: they are the signal of "registered", so the updates stop re-registering the module. Returns text to add
+ * to the message when that failed (the module is then still re-registered by the next update), nothing otherwise.
+ */
+function forgetRegistration(): string {
+  try {
+    removeStagedModules(defaultRegistryDir(process.env));
+    return '';
+  } catch (err) {
+    return ` The staged copy in the registry folder could not be removed (${errorMessage(err)}): delete the folder app-module there, or the next update registers the module again.`;
+  }
+}
+
 /** Removes the module from app-core. Same rules as attemptRegistration; an id app-core never knew is ok. */
 export async function attemptUnregistration(): Promise<AppCoreAttempt> {
   try {
     const outcome = await unregisterModule({ id: APP_CORE_MODULE_ID });
+    const ok = outcome.status !== 'refused';
     return {
-      ok: outcome.status !== 'refused',
+      ok,
       status: outcome.status,
-      message: describeOutcome(outcome),
+      message: ok ? `${describeOutcome(outcome)}${forgetRegistration()}` : describeOutcome(outcome),
     };
   } catch (err) {
     return {

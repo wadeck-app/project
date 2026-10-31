@@ -41,6 +41,7 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
 | Resolution | `resolveReference`, `findProjectForPath`, `resolveScope` (flag > env > cwd; `label` names the source of an explicit reference), `describeResolution`, `requirePath` |
 | Inheritance | `getChain`, `getAncestors` (parent first), `getChildren`, `getDescendants` (breadth-first, cycle-safe; the project itself is never included), `getConfigLayers`, `projectToolDir(registryDir, id, tool, kind, { ensure })` with kind `config`, `data`, `cache` or `logs` (`<registryDir>/projects/<id>/<tool>/<kind>`) |
 | Config helpers | `validateLayer`, `mergeLayers(schema, layers)`, root-first with the project's own layer last; `ConfigSchema` scopes `global`, `local`, `inherit`; merges `replace`, `deep`, `append`; the CLIs parse the files |
+| Related items | `parseRelatedResponse(input)`, `buildRelatedResponse(panel)`, `assertRelatedResponse(input)`, `isModuleUrl(url)`, types `RelatedPanel`, `RelatedItem`, error `InvalidRelatedResponseError` |
 | Infra | `withRegistryLock`, `writeFileAtomic`, `lockFilePath` |
 | Helpers | `toNativePath(path, platform?)`, `normalizePath(path, base?)`, `pathKey(path, base?)`, `isSameOrInside`, `assertDirectory`, `generateId`, `isIdLike`, `normalizeLabel`, `deriveName(path)`, `describeProject(project)`, `mainPath(project)`, `isVirtual(project)`, `levenshtein` |
 
@@ -130,6 +131,30 @@ A section may declare `fields` (one nested level, e.g. `plugins.github`): `valid
 ## Locking and tool data
 
 The registry lock protects only `registry.json` and `deleted_projects.json`. Consistency of tool data (several files, `task-index.json`, ...) is the tool's own concern in v1. `withRegistryLock` (async) and `writeFileAtomic` (sync) are exported as written and may be used by tools for their own files.
+
+## Related items (contract between modules)
+
+A module that holds things concerning a project (tasks, flows, queues...) answers `GET /api/modules/<its id>/related/project/<projectId>` (`projectId`: the 8-hex id) with a `RelatedPanel`; the `project` app-core module shows it on the page of the project. The contract lives here so that provider and consumer cannot drift.
+
+```ts
+interface RelatedPanel {
+  title: string;
+  count?: number;          // may exceed items.length
+  countLabel?: string;     // shown after the count: "3 open"
+  truncated?: boolean;     // items is a partial list
+  items: { label: string; url: string; subtitle?: string }[];
+  moreUrl?: string;        // the full list
+}
+```
+
+| Function | Use |
+|---|---|
+| `parseRelatedResponse(input: unknown): RelatedPanel` | Consumer: validates types, ignores unknown fields (the contract can grow), returns only the contract's fields |
+| `buildRelatedResponse(panel: RelatedPanel): RelatedPanel` | Provider: the same validation on what you are about to send |
+| `assertRelatedResponse(input: unknown): asserts input is RelatedPanel` | Provider tests: conformance check of a real answer |
+| `isModuleUrl(url: unknown): url is string` | True for `/modules/...`; false for any other path, an external or `//` address, a scheme, a backslash, a control character, a `//` anywhere (even in the query) |
+
+Every failure is an `InvalidRelatedResponseError` (code `INVALID_RELATED_RESPONSE`) with `path` (`title`, `items[2].url`, `$`) and `reason`; its message names both. Statuses of the route: 200 data, 404 no such route and 409 not applicable to this project (both mean "nothing to show", the consumer remembers it for 60 s), anything else is a failure shown as a warning.
 
 ## Callers without a cwd
 

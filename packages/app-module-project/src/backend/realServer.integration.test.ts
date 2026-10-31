@@ -1,6 +1,7 @@
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { request as httpRequest } from 'node:http';
 import { connect, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -277,6 +278,33 @@ ${serverOutput}`);
       ['alpha', 0],
       ['gamma', 1],
     ]);
+  });
+
+  /** A request with exactly the headers given (fetch cannot set Host or Origin freely). */
+  function rawPost(headers: Record<string, string>): Promise<{ status: number; body: any }> {
+    return new Promise((resolve, reject) => {
+      const body = JSON.stringify({ name: 'intruder', virtual: true });
+      const req = httpRequest({ host: '127.0.0.1', port, path: api('/projects'), method: 'POST', headers: { 'content-length': String(Buffer.byteLength(body)), ...headers } }, (res) => {
+        let text = '';
+        res.on('data', (chunk) => (text += chunk));
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: JSON.parse(text) }));
+      });
+      req.on('error', reject);
+      req.end(body);
+    });
+  }
+
+  it('refuses a change that is not from the local pages: foreign Host (DNS rebinding), foreign Origin, form content type', async () => {
+    const json = { 'content-type': 'application/json' };
+    expect((await rawPost({ ...json, host: 'evil.example' })).status).toBe(403);
+    expect((await rawPost({ ...json, host: `127.0.0.1:${port}`, origin: 'https://evil.example' })).status).toBe(403);
+    expect((await rawPost({ 'content-type': 'text/plain', host: `127.0.0.1:${port}` })).status).toBe(415);
+    // A browser of the page itself (same Origin) and a client without Origin both pass.
+    expect((await rawPost({ ...json, host: `127.0.0.1:${port}`, origin: `http://127.0.0.1:${port}` })).status).toBe(201);
+    expect((await call('POST', api('/projects'), { name: 'second' })).status).toBe(201);
+    const names = (await call('GET', api('/projects'))).body.projects.map((p: { name: string }) => p.name);
+    expect(names).not.toContain('evil');
+    expect(names).toContain('intruder');
   });
 
   it('the contributor is accepted by app-core in both slots, and the slot routes answer its DSL nodes', async () => {

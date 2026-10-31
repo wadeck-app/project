@@ -16,6 +16,8 @@ export interface CallOptions {
   params?: Record<string, string>;
   query?: Record<string, unknown>;
   body?: unknown;
+  /** Added to the headers of a local browser request (Host and Content-Type); a value of undefined removes the header. */
+  headers?: Record<string, string | undefined>;
 }
 
 interface Route {
@@ -67,7 +69,13 @@ export function makeModule(): { call: (method: string, path: string, options?: C
           return reply;
         },
       };
-      await found.handler({ params, query, body: options.body }, reply);
+      const headers: Record<string, string | undefined> = { host: '127.0.0.1:4850', 'content-type': 'application/json', ...(options.headers ?? {}) };
+      for (const name of Object.keys(headers)) {
+        if (headers[name] === undefined) {
+          delete headers[name];
+        }
+      }
+      await found.handler({ params, query, body: options.body, headers }, reply);
       return { status, body };
     },
   };

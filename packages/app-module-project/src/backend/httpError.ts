@@ -29,6 +29,8 @@ export class RequestError extends Error {
     readonly status: number,
     message: string,
     readonly hint?: string,
+    /** Stable code of the answer (`error` of the body). */
+    readonly code: string = 'BAD_REQUEST',
   ) {
     super(message);
     this.name = 'RequestError';
@@ -95,7 +97,7 @@ function withHint(message: string, hint: string | undefined): string {
  */
 export function toHttpError(error: unknown): HttpErrorResult {
   if (error instanceof RequestError) {
-    return { status: error.status, body: { error: 'BAD_REQUEST', message: withHint(error.message, error.hint), ...(error.hint === undefined ? {} : { hint: error.hint }) } };
+    return { status: error.status, body: { error: error.code, message: withHint(error.message, error.hint), ...(error.hint === undefined ? {} : { hint: error.hint }) } };
   }
   if (error instanceof ProjectError) {
     const hint = hintOf(error);
