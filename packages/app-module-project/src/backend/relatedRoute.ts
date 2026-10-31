@@ -38,6 +38,8 @@ export function registerRelatedRoute(kit: RouteKit): void {
         title: p.title,
         countText: countTextOf({ ...p, items: p.items ?? [] }),
         noteText: p.truncated === true ? 'partial list' : '',
+        // The link of the column "See all" (the SDK has checked that moreUrl is a /modules/ page); no text, no link, when there is none.
+        seeAllText: p.moreUrl === undefined ? '' : 'See all',
         href: p.moreUrl ?? '',
       })),
       rows: panels.flatMap((p) => (p.items ?? []).map((item) => ({ module: p.module, panel: p.title, label: item.label, subtitle: item.subtitle ?? '', href: item.url }))),

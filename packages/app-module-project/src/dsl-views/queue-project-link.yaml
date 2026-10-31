@@ -1,5 +1,8 @@
 # Contribution to queue:project-header. Host context: $sources.projectScope = { id, name, found }; shown only when the project was found.
 $type: ButtonLink
+# Same size and variant as the header links of the hosts (small, secondary), so that the row is even.
+size: sm
+variant: secondary
 $if: $sources.projectScope.found
 label: $sources.projectScope.name
 to: "$concat('/modules/project/p/', $sources.projectScope.id)"

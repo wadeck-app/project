@@ -198,6 +198,12 @@ describe('dsl-views', () => {
     expect(page).not.toContain('.count');
   });
 
+  // A provider's moreUrl must be a visible link, not only the click on the row: a column with the text "See all" whose address is the row href.
+  it('the Related table shows a "See all" link per panel (empty text, so no link, when the provider sent no moreUrl)', () => {
+    const page = readFileSync(join(viewsDir, 'project-page.yaml'), 'utf8');
+    expect(page).toContain("{ key: 'seeAllText', label: '', href: '{href}', nowrap: true }");
+  });
+
   it('the detail page embeds both slots, with the sources of the shell', () => {
     const page = readFileSync(join(viewsDir, 'project-page.yaml'), 'utf8');
     expect(page).toContain('url: GET /api/slots/project:project-links');

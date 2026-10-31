@@ -3,6 +3,9 @@
 # The address is built with $concat (dsl-renderer 2026.10.31-306 or later): a prop is an expression only when it starts with $, a path inside a
 # string ("/modules/project/p/$route.project") would be followed as typed. A contributed node has no $sources of its own.
 $type: ButtonLink
+# Same size and variant as the header links of the hosts (small, secondary), so that the row is even.
+size: sm
+variant: secondary
 $if: $route.project
 label: Project
 to: "$concat('/modules/project/p/', $route.project)"

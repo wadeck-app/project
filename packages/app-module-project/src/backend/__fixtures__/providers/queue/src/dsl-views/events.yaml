@@ -16,3 +16,8 @@ sections:
     items:
       - $type: ExtensionSlot
         items: $sources.header
+      - $type: ButtonLink
+        size: sm
+        variant: secondary
+        label: Replay
+        to: /modules/x/replay

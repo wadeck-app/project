@@ -399,6 +399,7 @@ sections:
           - { key: 'title', label: 'What' }
           - { key: 'countText', label: 'Count', nowrap: true }
           - { key: 'noteText', label: '', nowrap: true }
+          - { key: 'seeAllText', label: '', href: '{href}', nowrap: true }
       - $type: DataTable
         $if: $sources.related.hasPanels
         rows: $sources.related.rows

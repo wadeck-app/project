@@ -96,6 +96,14 @@ describe('the widgets it contributes', () => {
     expect(guard('flow:executions-project-header')).toBe('$urlParam.project');
   });
 
+  // The hosts' own header links are small secondary buttons (flow: size sm, variant secondary; task: size sm): at the default size ours was 38 px
+  // high next to their 26 px (seen in the real shell).
+  it.each(Object.keys(PROVIDERS))('%s: is a small secondary button, like the header links of the hosts', (slot) => {
+    const view = viewOf(widgets.find((p) => p.slot === slot)!);
+    expect(view['size'], slot).toBe('sm');
+    expect(view['variant'], slot).toBe('secondary');
+  });
+
   it('is labelled with the name of the project when the host gives it, else "Project"', () => {
     const label = (slot: string): unknown => viewOf(widgets.find((p) => p.slot === slot)!)['label'];
     expect(label('task:project-header')).toBe('Project');

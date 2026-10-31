@@ -15,3 +15,8 @@ sections:
     items:
       - $type: ExtensionSlot
         items: $sources.header
+      - $type: ButtonLink
+        size: sm
+        variant: secondary
+        label: Logs
+        to: /modules/x/logs

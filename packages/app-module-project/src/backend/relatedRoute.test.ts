@@ -24,7 +24,7 @@ describe('GET /projects/:ref/related', () => {
     expect(app.calls).toEqual([`task:${shop.id}`]);
     expect(body.projectId).toBe(shop.id);
     expect(body.panels).toEqual([{ module: 'task', title: 'Tasks', count: 2, items: expect.any(Array), moreUrl: '/modules/task/tasks?project=shop' }]);
-    expect(body.summary).toEqual([{ module: 'task', title: 'Tasks', countText: '2 recent items', noteText: '', href: '/modules/task/tasks?project=shop' }]);
+    expect(body.summary).toEqual([{ module: 'task', title: 'Tasks', countText: '2 recent items', noteText: '', seeAllText: 'See all', href: '/modules/task/tasks?project=shop' }]);
     expect(body.rows).toEqual([
       { module: 'task', panel: 'Tasks', label: 'Fix it', subtitle: 'open', href: '/modules/task/tasks/a' },
       { module: 'task', panel: 'Tasks', label: 'Other', subtitle: '', href: '/modules/task/tasks/b' },
@@ -42,8 +42,8 @@ describe('GET /projects/:ref/related', () => {
     process.env['APP_CORE_PORT'] = new URL(app.baseUrl).port;
     const { body } = await makeModule().call('GET', '/projects/shop/related');
     expect(body.summary).toEqual([
-      { module: 'flow', title: 'Flows', countText: '1 item', noteText: '', href: '' },
-      { module: 'task', title: 'Tasks', countText: '3 open', noteText: 'partial list', href: '/modules/task' },
+      { module: 'flow', title: 'Flows', countText: '1 item', noteText: '', seeAllText: '', href: '' },
+      { module: 'task', title: 'Tasks', countText: '3 open', noteText: 'partial list', seeAllText: 'See all', href: '/modules/task' },
     ]);
   });
 
@@ -53,7 +53,7 @@ describe('GET /projects/:ref/related', () => {
     const app = await fakeAppCore(['flow'], { flow: (_req, res) => json(res, 200, { title: 'Flow executions', count: 0, items: recent, moreUrl: '/modules/flow/executions?project=shop' }) });
     process.env['APP_CORE_PORT'] = new URL(app.baseUrl).port;
     const { body } = await makeModule().call('GET', '/projects/shop/related');
-    expect(body.summary).toEqual([{ module: 'flow', title: 'Flow executions', countText: '10 recent items', noteText: '', href: '/modules/flow/executions?project=shop' }]);
+    expect(body.summary).toEqual([{ module: 'flow', title: 'Flow executions', countText: '10 recent items', noteText: '', seeAllText: 'See all', href: '/modules/flow/executions?project=shop' }]);
   });
 
   it('does not ask again for a minute a module that said it has nothing for this project (negative cache)', async () => {

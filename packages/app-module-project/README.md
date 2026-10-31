@@ -80,6 +80,8 @@ Each contribution is a `ButtonLink` to the page of the project, with no `$source
 | `flow:execution-project-header` | `ButtonLink`, `IconButton`, `Badge`, `Link` | `$sources.execution.projectId` / `.projectLabel` | the execution has a `projectId` (old ones do not: no link) | `projectLabel`, else "Project" |
 | `flow:executions-project-header` | same | the URL parameter `project` (`$urlParam.project`) | the parameter is present | "Project" |
 
+All four are `ButtonLink` with `size: sm` and `variant: secondary`, like the header links of the hosts (flow: `size: sm, variant: secondary`; task: `size: sm`): at the default size they were 38 px high next to the hosts' 26 px; they now measure 26 px on the fixture pages that replicate the hosts' small links. `ButtonLink` has no no-wrap prop, so a long label (flow: "agent-fleet (92541e63)") can wrap in a narrow row.
+
 The address is built in the view: `to: "$concat('/modules/project/p/', $route.project)"`. A prop is an expression only when it starts with `$`: `/modules/project/p/$route.project` is followed as typed. The project page accepts an id, a name or an alias, so `?project=shop` works as well as `?project=<id>`. `$concat(...)` and `$urlParam.<name>` in a node prop (also in a contributed node) need dsl-renderer / dsl-ui 2026.10.31-306 or later; `$urlParam` and `$concat` are **not** available in the `params` or `url` of `$sources`.
 
 **Minimal versions** (pinned by `packages/project-cli/src/lockfile.test.ts`): `@wadeck-app/app-core-cli` and `@wadeck-app/app-core-sdk` 2026.10.31-145-cc2b3d27 (`optionalRequires`, `--link <moduleId>=<folder>` for optional providers, a shell with `$concat`), `@wadeck-app/dsl-ui` and `@wadeck-app/dsl-renderer` 2026.10.31-306-a2da8f4a.
@@ -102,6 +104,8 @@ Unknown fields are ignored; a wrong type of a known field, or a `url` / `moreUrl
 | 404 | No such route | Module left out, not asked again for 60 s |
 | 409 | Not applicable to this project (e.g. a virtual project) | Module left out, not asked again for 60 s |
 | Other, timeout (2 s), invalid shape | Failure | Warning shown with the module name, asked again at the next request |
+
+In the Related table each panel has a **See all** link (column `seeAllText`) to the provider's `moreUrl`, a `/modules/` page already validated by the SDK; a provider without `moreUrl` gets an empty cell, no link.
 
 | Provider sends | Count column shows |
 |---|---|
