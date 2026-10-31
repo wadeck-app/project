@@ -11,6 +11,8 @@ interface Step {
   uses?: string;
   run?: string;
   env?: Record<string, string>;
+  shell?: string;
+  if?: string;
   with?: Record<string, string>;
 }
 
@@ -32,6 +34,38 @@ describe('publish.yml', () => {
   it('still builds and tests on the three systems before publishing', () => {
     expect(workflow.jobs['build-and-test']!.strategy!.matrix.os).toEqual(OS);
     expect([workflow.jobs['publish']!.needs].flat()).toContain('build-and-test');
+  });
+
+  describe('build-and-test', () => {
+    const steps = workflow.jobs['build-and-test']!.steps;
+    const named = (text: string): Step => steps.find((s) => s.name?.includes(text))!;
+
+    it('runs the tests in bash with their output kept in a file and the exit code of the tests (pipefail)', () => {
+      const run = named('Run tests');
+      expect(run.shell).toBe('bash');
+      expect(run.run).toContain('set -o pipefail');
+      expect(run.run).toContain('npm test 2>&1 | tee "${{ runner.temp }}/tests.log"');
+    });
+
+    it('annotates the end of the log when the job fails, right after the tests (a Windows failure is otherwise unreadable)', () => {
+      const index = steps.indexOf(named('Annotate the failure of the tests'));
+      expect(index).toBe(steps.indexOf(named('Run tests')) + 1);
+      expect(steps[index]!.if).toBe('failure()');
+      expect(steps[index]!.run).toContain('annotate-failure.mjs');
+      expect(steps[index]!.run).toContain('tests.log');
+      expect(existsSync(join(repoRoot, 'packages', 'project-cli', 'ci', 'scripts', 'annotate-failure.mjs'))).toBe(true);
+    });
+
+    it('checks the app-core module (layout, manifest, slots) before the tests', () => {
+      const check = named('Check the app-core module');
+      expect(check.run).toBe('npm run check');
+      expect(steps.indexOf(check)).toBeLessThan(steps.indexOf(named('Run tests')));
+    });
+  });
+
+  it('publishes the app-module with the CLI: the generated dist package lists app-module/ (the canonical script is untouched, the extra is an argument)', () => {
+    const generate = workflow.jobs['publish']!.steps.find((s) => s.run?.includes('generate-platform-packages.sh'))!;
+    expect(generate.run).toContain('generate-platform-packages.sh project:app-module/');
   });
 
   it('exposes the published version as an output of the publish job', () => {
@@ -56,10 +90,26 @@ describe('publish.yml', () => {
       const node = job.steps.find((s) => s.uses?.startsWith('actions/setup-node'))!;
       expect(node.with).toMatchObject({ 'registry-url': 'https://npm.pkg.github.com', scope: '@wadeck-app' });
       expect(job.defaults?.run?.shell).toBe('bash');
-      const runs = job.steps.filter((s) => s.run !== undefined);
+      // The annotation steps only read a local log: they get no token.
+      const runs = job.steps.filter((s) => s.run !== undefined && !s.run.includes('annotate-failure.mjs'));
       expect(runs.length).toBeGreaterThanOrEqual(2);
       for (const step of runs) {
         expect(step.env?.['NODE_AUTH_TOKEN'], step.name).toBe('${{ secrets.GITHUB_TOKEN }}');
+      }
+    });
+
+    it('keeps the output of each check in a log and annotates the end of it when the check fails', () => {
+      for (const [script, log] of [
+        ['verify-install.sh', 'verify-install.log'],
+        ['verify-update.sh', 'verify-update.log'],
+      ] as const) {
+        const run = job.steps.find((s) => s.run?.includes(script))!;
+        expect(run.run, script).toContain('set -o pipefail');
+        expect(run.run, script).toContain(`tee "\${{ runner.temp }}/${log}"`);
+        const next = job.steps[job.steps.indexOf(run) + 1]!;
+        expect(next.if, script).toBe('failure()');
+        expect(next.run, script).toContain('annotate-failure.mjs');
+        expect(next.run, script).toContain(log);
       }
     });
 

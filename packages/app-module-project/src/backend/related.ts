@@ -91,12 +91,12 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
-/** The panel of one module, or undefined when it has nothing to say (404). A failure is a panel with `error`: it never throws. */
+/** The panel of one module, or undefined when it has nothing to say: 404 (no such route) or 409 (not applicable to this project). A failure is a panel with `error`: it never throws. */
 async function ask(module: string, projectId: string, options: Required<RelatedOptions>): Promise<RelatedPanel | undefined> {
   const url = `${options.baseUrl}/api/modules/${encodeURIComponent(module)}/related/project/${encodeURIComponent(projectId)}`;
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(options.timeoutMs) });
-    if (response.status === 404) {
+    if (response.status === 404 || response.status === 409) {
       return undefined;
     }
     if (!response.ok) {

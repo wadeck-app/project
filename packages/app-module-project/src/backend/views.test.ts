@@ -132,9 +132,19 @@ describe('dsl-views', () => {
     }
   });
 
+  // The shell glues the params to the url with '?': a url that already has a query AND params became 'a?x=1?label=..' (seen in a browser).
+  // So a source with params gets inlineErrors as one of them, and a source without params has it in the url.
   it.each(viewFiles)('%s: the sources of the module answer errors as data (inlineErrors), so that one failure does not blank the page', (file) => {
-    for (const source of urlsOf(file, '$sources').filter((c) => c.url.startsWith('/api/modules/project'))) {
-      expect(source.url, `${file} ${source.name}`).toContain('inlineErrors=true');
+    const document = parseView(file);
+    const sources = (document['$sources'] ?? {}) as Record<string, { url: string; params?: Record<string, unknown> }>;
+    for (const [name, source] of Object.entries(sources).filter(([, spec]) => spec.url.includes('/api/modules/project'))) {
+      // A param written as {key} in the url fills the path and is not glued to the query (checked in a browser on the detail page).
+      const hasParams = Object.keys(source.params ?? {}).some((key) => key !== 'inlineErrors' && !source.url.includes(`{${key}}`));
+      if (hasParams && source.url.includes('?')) {
+        throw new Error(`${file} ${name}: a url with a query string and params break in the shell; move the query into params`);
+      }
+      const inline = source.url.includes('inlineErrors=true') || source.params?.['inlineErrors'] === 'true';
+      expect(inline, `${file} ${name}`).toBe(true);
     }
   });
 

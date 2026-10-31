@@ -2,6 +2,8 @@
 
 app-core module `project`: pages to browse and change the shared project registry (`<XDG_CONFIG_HOME or ~/.config>/project`). It is the only UI that writes the registry, always through `@wadeck-app/project-sdk` (lock, atomic write, validation), so every change is as safe as one made with the `project` command. Each change is also logged in the daily log of the registry folder.
 
+It is shipped inside the `project` CLI package (`project cli register` tells app-core where it is, see `packages/project-cli/README.md`).
+
 Scripts: `npm run check` (layout and manifest), `BUNDLE_VERSION=<v> npm run bundle` (packages into `dist-module`), `npm test`.
 
 ## Pages
@@ -62,8 +64,17 @@ For data of other modules, the module aggregates it in its backend. A module tha
 ```
 
 - `title` (non-empty text) and `items` (list) are required; `count` (whole number), `subtitle` and `moreUrl` are optional.
+- Unknown fields (of the answer and of the items) are ignored, so the contract can grow; a wrong type of a known field is a warning.
 - Every `url` and `moreUrl` must start with `/modules/` (an external or `//host` address makes the panel invalid).
-- 404 means "nothing to say": the module is left out silently.
+
+Status the module answers:
+
+| Status | Meaning | Effect |
+|---|---|---|
+| 200 | Data | Panel shown |
+| 404 | No such route | Module left out |
+| 409 | Not applicable to this project (e.g. a virtual project) | Module left out |
+| Other, timeout, invalid shape | Failure | Warning shown with the module name |
 
 `GET /projects/:ref/related` asks every other installed module in parallel (2 s each; the list comes from `GET /api/modules` of the same server, on `APP_CORE_PORT`, else the port app-core wrote, else 4850). It answers `{ projectId, hasPanels, panels, summary, rows, warnings, emptyText? }`; `panels` is sorted by module id. A module that fails, times out or answers an invalid shape becomes a `warnings` entry `{ module, text }` shown on the page, never hidden.
 

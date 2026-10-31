@@ -13,6 +13,7 @@
     "clean": "rimraf dist dist-bundle launcher-go"
   },
   "dependencies": {
+    "@wadeck-app/app-core-sdk": "latest",
     "@wadeck-app/project-sdk": "*",
     "@wadeck-app/shared-cli": "latest",
     "@wadeck-app/shared-updater": "latest"

@@ -46,5 +46,20 @@ fi
 assert_contains "project resolve in an unregistered folder" "no project in scope" "$(last_stderr)"
 assert_contains "project resolve in an unregistered folder" "hint:" "$(last_stderr)"
 
+step "(e) the package ships the app-module (the pages of app-core) and 'project cli register' defers it when app-core is not running"
+PACKAGE_DIR="$(installed_package_dir)"
+assert_file "the packaged manifest of the app-module" "$PACKAGE_DIR/app-module/manifest.json"
+assert_contains "the packaged manifest of the app-module" "\"id\": \"project\"" "$(cat "$PACKAGE_DIR/app-module/manifest.json")"
+assert_contains "the packaged manifest of the app-module" "\"version\": \"$VERSION\"" "$(cat "$PACKAGE_DIR/app-module/manifest.json")"
+pick_free_port
+run_project cli register --json || fail "project cli register exited with status $? (it must defer when app-core is not running)"
+assert_contains "project cli register" "\"status\": \"deferred\"" "$(last_stdout)"
+# The copy app-core will load at its next start lives in the registry folder: it must survive an update or removal of the npm folder.
+assert_file "the staged copy of the app-module" "$XDG_CONFIG_HOME/project/app-module/$VERSION/manifest.json"
+assert_file "the pending registration for app-core" "$APP_CORE_CONFIG_DIR/modules/project.json"
+run_project cli unregister --json || fail "project cli unregister exited with status $?"
+[ ! -e "$APP_CORE_CONFIG_DIR/modules/project.json" ] || fail "project cli unregister left the pending registration $APP_CORE_CONFIG_DIR/modules/project.json"
+echo "ok: the pending registration was removed"
+
 echo
 echo "verify-install: all steps passed for $VERSION on $(uname -s)"

@@ -1,8 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { isolatedCliEnv } from './testHelpers.js';
 
@@ -28,7 +29,28 @@ function runBundleScript(env: NodeJS.ProcessEnv): Outcome {
 // and "autoUpdate: false" (written by isolatedCliEnv) keeps it from ever installing anything.
 const sandbox = mkdtempSync(join(tmpdir(), 'project-cli-dist-env-'));
 const isolatedEnv = isolatedCliEnv(sandbox);
-afterAll(() => rmSync(sandbox, { recursive: true, force: true }));
+afterAll(() => rmSync(sandbox, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
+
+/** Every file under a folder, relative and with forward slashes, sorted. */
+function filesUnder(dir: string, prefix = ''): string[] {
+  return readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => (entry.isDirectory() ? filesUnder(join(dir, entry.name), `${prefix}${entry.name}/`) : [`${prefix}${entry.name}`]))
+    .sort();
+}
+
+/** Paths compared the way Windows does: separators and case do not matter. */
+const samePath = (path: string): string => path.split(String.fromCharCode(92)).join('/').toLowerCase();
+
+async function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address() as { port: number };
+      server.close(() => resolve(port));
+    });
+  });
+}
 
 function node(script: string, args: string[]): Outcome {
   const result = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: { ...process.env, ...isolatedEnv } });
@@ -55,8 +77,22 @@ describe('the bundle (ci/scripts/bundle.ts)', () => {
     expect(existsSync(join(bundleDir, 'project-updater.cjs'))).toBe(true);
   });
 
+  it('packages the app-module next to the bundles: a registrable manifest stamped with the same version, and its backend', () => {
+    const manifestFile = join(bundleDir, 'app-module', 'manifest.json');
+    expect(existsSync(manifestFile), 'dist-bundle/app-module/manifest.json: bundle.ts must run the bundle of app-module-project').toBe(true);
+    const manifest = JSON.parse(readFileSync(manifestFile, 'utf8')) as { id: string; version: string; backendEntryPath: string };
+    expect(manifest).toMatchObject({ id: 'project', version: STAMP });
+    expect(existsSync(join(bundleDir, 'app-module', manifest.backendEntryPath))).toBe(true);
+  });
+
   it('keeps the updater bundle under 500 KB', () => {
     expect(statSync(join(bundleDir, 'project-updater.cjs')).size).toBeLessThan(500 * 1024);
+  });
+
+  it('does not put the CLI runtime in the updater: it registers with the app-core SDK, nothing of the commands', () => {
+    const updater = readFileSync(join(bundleDir, 'project-updater.cjs'), 'utf8');
+    expect(updater).toContain('registerModule');
+    expect(updater).not.toContain('paths remove');
   });
 
   it('bundles the updater that journals an install and repairs an interrupted one (shared-updater 2026.10.25-019 or later)', () => {
@@ -75,6 +111,29 @@ describe('the bundle (ci/scripts/bundle.ts)', () => {
     expect(result.stderr).toContain('[ok]');
     // The checks work in temporary registries: the registry of the user is not created.
     expect(existsSync(join(sandbox, 'xdg', 'project', 'registry.json'))).toBe(false);
+  });
+});
+
+describe('project cli register with the bundle, app-core not running', () => {
+  it('stages the app-module in the registry folder and leaves it for the next start of app-core: outcome deferred, exit 0, and says so', async () => {
+    const appCoreConfig = join(sandbox, 'app-core');
+    mkdirSync(appCoreConfig, { recursive: true });
+    const env = { ...isolatedEnv, APP_CORE_CONFIG_DIR: appCoreConfig, APP_CORE_PORT: String(await freePort()) };
+    const result = spawnSync(process.execPath, [join(bundleDir, 'project.cjs'), 'cli', 'register', '--json'], { encoding: 'utf8', env });
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ ok: true, status: 'deferred' });
+    const staged = join(sandbox, 'xdg', 'project', 'app-module', STAMP, 'manifest.json');
+    expect(existsSync(staged), 'the staged copy must outlive the npm folder').toBe(true);
+    const pickup = JSON.parse(readFileSync(join(appCoreConfig, 'modules', 'project.json'), 'utf8')) as { source: { path: string } };
+    expect(samePath(pickup.source.path)).toBe(samePath(staged));
+  });
+
+  it('unregister with app-core not running removes the pending registration, exit 0', async () => {
+    const env = { ...isolatedEnv, APP_CORE_CONFIG_DIR: join(sandbox, 'app-core'), APP_CORE_PORT: String(await freePort()) };
+    const result = spawnSync(process.execPath, [join(bundleDir, 'project.cjs'), 'cli', 'unregister', '--json'], { encoding: 'utf8', env });
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ ok: true, status: 'cleared' });
+    expect(existsSync(join(sandbox, 'app-core', 'modules', 'project.json'))).toBe(false);
   });
 });
 
@@ -110,7 +169,8 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
   it('generates the dist package under the published name, and the 3 platform packages', () => {
-    const generated = bash('generate-platform-packages.sh', ['project']);
+    // The extra after ':' puts the app-module folder in the files of the dist package.
+    const generated = bash('generate-platform-packages.sh', ['project:app-module/']);
     expect(generated.status, generated.stderr).toBe(0);
     expect(packageJson('project-cli-dist')).toMatchObject({
       name: '@wadeck-app/project-cli',
@@ -123,6 +183,7 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
     });
     expect(packageJson('project-cli-dist')).not.toHaveProperty('private', true);
     expect(packageJson('project-cli-dist')).not.toHaveProperty('dependencies');
+    expect((packageJson('project-cli-dist') as { files: string[] }).files).toContain('app-module/');
     expect(packageJson('project-cli-win32-x64')).toMatchObject({ name: '@wadeck-app/project-cli-win32-x64', os: ['win32'], cpu: ['x64'], files: ['project.exe'] });
     expect(packageJson('project-cli-darwin-arm64')).toMatchObject({ name: '@wadeck-app/project-cli-darwin-arm64', os: ['darwin'], cpu: ['arm64'], files: ['project'] });
     expect(packageJson('project-cli-darwin-x64')).toMatchObject({ name: '@wadeck-app/project-cli-darwin-x64', os: ['darwin'], cpu: ['x64'], files: ['project'] });
@@ -136,19 +197,22 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
     expect(launcher).not.toContain('{{');
   });
 
-  it('copies the launchers, the bundles and the README into the packages', () => {
+  it('copies the launchers, the bundles, the app-module and the README into the packages', () => {
     const copied = bash('copy-binaries.sh');
     expect(copied.status, copied.stderr).toBe(0);
     for (const file of ['project-cli-win32-x64/project.exe', 'project-cli-darwin-arm64/project', 'project-cli-darwin-x64/project']) {
       expect(existsSync(join(root, 'packages', file)), file).toBe(true);
     }
+    expect(filesUnder(join(root, 'packages', 'project-cli-dist', 'app-module'))).toEqual(filesUnder(join(bundleDir, 'app-module')));
   });
 
-  it('publishes exactly the launcher, the two bundles, the README and the manifest in the dist package', () => {
+  it('publishes exactly the launcher, the two bundles, the app-module, the README and the manifest in the dist package', () => {
     const dist = join(root, 'packages', 'project-cli-dist');
     const output = execFileSync('npm', ['pack', '--dry-run', '--json'], { cwd: dist, encoding: 'utf8', shell: process.platform === 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
     const files = (JSON.parse(output) as { files: { path: string }[] }[])[0]!.files.map((f) => f.path).sort();
-    expect(files).toEqual(['README.md', 'bin/project.js', 'package.json', 'project-updater.cjs', 'project.cjs']);
+    const appModule = filesUnder(join(bundleDir, 'app-module')).map((file) => `app-module/${file}`);
+    expect(appModule).toContain('app-module/manifest.json');
+    expect(files).toEqual(['README.md', 'bin/project.js', 'package.json', 'project-updater.cjs', 'project.cjs', ...appModule].sort());
   });
 
   it('runs from the generated layout and prints the stamped version', () => {

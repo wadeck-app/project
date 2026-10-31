@@ -166,6 +166,12 @@ describe('detailOf', () => {
     expect(detail.labelRows).toEqual([{ label: 'state::production' }]);
   });
 
+  it('gives the identity as labelled lines for the page (a badge shows a bare value without its meaning)', () => {
+    const detail = detailOf(registryDir, registry, shop);
+    expect(detail).toMatchObject({ idLine: 'ID: ' + shop.id, aliasesLine: 'Aliases: sh', labelsLine: 'Labels: state::production', gitLine: 'Git: git@x:shop.git' });
+    expect(detailOf(registryDir, registry, grand)).toMatchObject({ aliasesLine: 'Aliases: none', labelsLine: 'Labels: none', gitLine: 'Git: none' });
+  });
+
   it('says where the tool folders are, from the id', () => {
     const detail = detailOf(registryDir, registry, shop);
     expect(detail.folder).toBe(`${registryDir}/projects/${shop.id}`);

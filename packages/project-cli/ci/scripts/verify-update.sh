@@ -43,8 +43,15 @@ first_run
 ACTUAL="$(installed_version)"
 assert_equals "installed version" "$PREVIOUS" "$ACTUAL"
 
+# app-core is not running here: the updater must leave the new pages for its next start (deferred), not fail and not skip silently.
+pick_free_port
+
 step "(e2) project cli update installs $VERSION"
 update_to "$VERSION"
+
+step "(e2b) the update told app-core about the app-module of $VERSION (deferred: app-core is not running)"
+assert_file "the staged copy of the app-module" "$XDG_CONFIG_HOME/project/app-module/$VERSION/manifest.json"
+assert_file "the pending registration for app-core" "$APP_CORE_CONFIG_DIR/modules/project.json"
 
 step "(e3) project cli rollback puts $PREVIOUS back"
 run_project cli rollback || fail "project cli rollback exited with status $?"
@@ -53,6 +60,7 @@ assert_equals "installed version after the rollback" "$PREVIOUS" "$ACTUAL"
 
 step "(e4) project cli update installs $VERSION again"
 update_to "$VERSION"
+assert_file "the staged copy of the app-module after the second update" "$XDG_CONFIG_HOME/project/app-module/$VERSION/manifest.json"
 
 echo
 echo "verify-update: all steps passed ($PREVIOUS -> $VERSION -> $PREVIOUS -> $VERSION) on $(uname -s)"

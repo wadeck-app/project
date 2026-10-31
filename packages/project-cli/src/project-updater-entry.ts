@@ -1,6 +1,8 @@
 // Entry point of the updater, bundled separately as project-updater.cjs. It must NOT import the CLI runtime (size limit, see ci/scripts/bundle.ts).
 import { defaultRegistryDir } from '@wadeck-app/project-sdk';
 import { cacheFilePath, execNpm, readCache, readState, runUpdater, stateFilePath, writeState } from '@wadeck-app/shared-updater';
+import { registerWithAppCore } from './AppCoreRegistration.js';
+import { readAppModuleVersion } from './registerAfterUpdate.js';
 import { runProjectUpdater } from './updater/runProjectUpdater.js';
 
 // Injected by esbuild (define) in ci/scripts/bundle.ts; the updater is only ever built that way.
@@ -31,6 +33,7 @@ runProjectUpdater({
   now: () => Date.now(),
   stdout: (line) => process.stdout.write(`${line}\n`),
   stderr: (line) => process.stderr.write(`${line}\n`),
+  appModule: { readVersion: readAppModuleVersion, register: registerWithAppCore },
 }).then((code) => {
   process.exitCode = code;
 });

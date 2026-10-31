@@ -32,10 +32,26 @@ Only a release stamped by CI (CalVer, checked by `isReleaseVersion` of `@wadeck-
 | `project cli rollback` | Reinstall the version before the last update |
 | `project cli logs [--follow]` | Today's log: the invocations of the CLI and the updater entries |
 | `project cli self-check` | Health checks (temporary registry, nothing is written to yours) |
+| `project cli register` | Tell app-core where the project pages are (see App-core pages) |
+| `project cli unregister` | Remove the project pages from app-core |
 
 Settings in `<registry folder>/config.yml` (the updater keeps its state, cache and logs there, next to `registry.json`): `autoUpdate: false`, `channel: <dist-tag>`, `checkInterval: <30m|4h|...>`.
 
 An update that cannot be verified is not attempted: if `npm root -g` fails, the run fails loudly (visible in `project cli update`, and as the failure notice of the next command).
+
+## App-core pages
+
+The package ships the app-core module `project` (`app-module/`, built from `packages/app-module-project`): pages to browse and change the registry. `project cli register` copies it to `<registry folder>/app-module/<version>/` (the copy outlives npm replacing or removing the package; older copies are removed once app-core holds the new one) and registers that copy. The updater does the same after an update that changed the app-module.
+
+| Outcome | Exit | Meaning |
+|---|---|---|
+| `registered` | 0 | app-core is running and loaded the module |
+| `deferred` | 0 | app-core is not running; it loads the module at its next start |
+| `skipped` | 0 | app-core is not installed |
+| `unconfirmed` | 0 | app-core did not answer in time; wait, then run `project cli register` again |
+| `refused`, `failed` | 1 | The message says what to fix (bad manifest, bad `APP_CORE_PORT`, ...) |
+
+`--json` prints `{ ok, status, message }`; a script that needs certainty tests `status`. Module documentation: `packages/app-module-project/README.md`.
 
 ## Logs
 
@@ -77,19 +93,19 @@ stderr always carries one line stating how the registry and project were resolve
 
 ## Distribution
 
-Same stack as the task and queue CLIs. `npm run bundle` (esbuild, needs `BUNDLE_VERSION`, no default) makes `project.cjs` and `project-updater.cjs` (< 500 KB), with the SDK inlined: the published package has no runtime dependency. `ci/scripts/generate-platform-packages.sh project` generates `project-cli-dist` (published as `@wadeck-app/project-cli`, with the `bin/project.js` launcher) and `project-cli-{win32-x64,darwin-arm64,darwin-x64}` (the Go launcher), `copy-binaries.sh` fills them. The pipeline is `.github/workflows/publish.yml`.
+Same stack as the task and queue CLIs. `npm run bundle` (esbuild, needs `BUNDLE_VERSION`, no default) makes `project.cjs` and `project-updater.cjs` (< 500 KB), with the SDK inlined: the published package has no runtime dependency. It also runs `npm run bundle` in `packages/app-module-project` and copies its `dist-module` to `dist-bundle/app-module/`. `ci/scripts/generate-platform-packages.sh project:app-module/` (the part after `:` adds `app-module/` to the files of the dist package) generates `project-cli-dist` (published as `@wadeck-app/project-cli`, with the `bin/project.js` launcher) and `project-cli-{win32-x64,darwin-arm64,darwin-x64}` (the Go launcher), `copy-binaries.sh` fills them. The pipeline is `.github/workflows/publish.yml`.
 
 | File | Origin |
 |---|---|
 | Go launcher sources, `build.sh` | not copied: `@wadeck-app/singleton-daemon-kit` (devDependency), `ci/scripts/build-launcher.mjs` calls its `build.sh` with `ci/launcher-project.config.json` |
 | `ci/templates/bin-launcher.js.tmpl`, `ci/scripts/generate-platform-packages.sh` | copied unchanged from the canonical `ci-templates` repo (`templates/`, `scripts/`, last changed in commit 094d29e) |
-| `ci/scripts/build-launcher.mjs`, `copy-binaries.sh` | written here from the equivalent scripts of `task-cli` (names changed, no app-module) |
+| `ci/scripts/build-launcher.mjs`, `copy-binaries.sh` | written here from the equivalent scripts of `task-cli` (names changed; the app-module is copied as in `task-cli`) |
 
 The canonical launcher template has no `windowsHide` and no `--cli-background` / `--cli-foreground` handling, which the task and queue copies added; the project CLI needs neither (no daemon, nothing spawns it in the background). If one day it does, change the template in `ci-templates` and copy it again.
 
 Platforms: Windows x64, macOS arm64 and macOS x64 have a platform package. **Linux has none yet**: the canonical template of `ci-templates` only knows those three (on Linux the `project` command prints `unsupported platform linux-x64`), although the Go launcher builder of `singleton-daemon-kit` now also builds `linux/amd64` and `linux/arm64`. Supporting Linux needs a change in `ci-templates` (a `linux-x64` entry in the template and the generator, then the same here); it is deliberately not forked here. Until then `node <global node_modules>/@wadeck-app/project-cli/project.cjs` runs the CLI on Linux, and that is what the Linux leg of the install check does.
 
-Install check: after each publish the job `verify-install` installs the published version on Linux, macOS and Windows in a temp environment and runs `ci/scripts/verify-install.sh <version>` (install, `--version`, `cli self-check`, a smoke test) and `ci/scripts/verify-update.sh <version>` (the previous published version updates itself, rolls back, updates again). Both can be run locally; see their headers.
+Install check: after each publish the job `verify-install` installs the published version on Linux, macOS and Windows in a temp environment and runs `ci/scripts/verify-install.sh <version>` (install, `--version`, `cli self-check`, a smoke test, the packaged app-module and the `deferred` outcome of `cli register` with app-core stopped) and `ci/scripts/verify-update.sh <version>` (the previous published version updates itself, rolls back, updates again; the update must register the app-module). Both can be run locally; see their headers.
 
 ## Development
 

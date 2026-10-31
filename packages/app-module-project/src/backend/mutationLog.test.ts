@@ -10,7 +10,7 @@ describe('logMutation', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'project-module-log-'));
   });
-  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+  afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
 
   const file = () => join(dir, 'logs', `${new Date().toISOString().slice(0, 10)}.ndjson`);
 

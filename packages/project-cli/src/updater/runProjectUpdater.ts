@@ -1,9 +1,17 @@
 import type { UpdateCache, UpdateState, UpdaterConfig } from '@wadeck-app/shared-updater';
 import { devBuildRefusalMessage, isReleaseVersion } from '@wadeck-app/shared-cli/ReleaseVersion';
+import { join } from 'node:path';
+import { type AppModuleVersion, registerAfterUpdate } from '../registerAfterUpdate.js';
 import { describeOutcome } from './outcome.js';
 import { selfCheckCommand } from './selfCheckCommand.js';
 
 export const PKG_NAME = '@wadeck-app/project-cli';
+
+/** What the updater needs to tell app-core about new pages (fakes in tests, the real files and the app-core SDK in the entry point). */
+export interface AppModuleDeps {
+  readVersion: (manifestPath: string) => AppModuleVersion;
+  register: (manifestPath: string, log: (entry: { source: string; message: string }) => void) => Promise<void>;
+}
 
 /** Everything the updater touches outside its own logic, so it can be run against fakes. */
 export interface UpdaterDeps {
@@ -23,6 +31,7 @@ export interface UpdaterDeps {
   now: () => number;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
+  appModule: AppModuleDeps;
 }
 
 /**
@@ -58,6 +67,9 @@ export async function runProjectUpdater(deps: UpdaterDeps): Promise<number> {
     }
   }
 
+  // A running app-core holds the previous pages until told: compare the app-module before and after the install.
+  const appModule = prepareAppModule(deps);
+  let crash: unknown;
   try {
     await deps.runUpdater({
       pkgName: PKG_NAME,
@@ -67,14 +79,43 @@ export async function runProjectUpdater(deps: UpdaterDeps): Promise<number> {
       onUpdateAvailable: async () => 'apply-now' as const,
     });
   } catch (error) {
-    if (force) {
-      reportOutcome();
-    }
-    stderr(`[project-updater] fatal: ${String(error)}`);
-    return 1;
+    crash = error;
   }
+  // Also after a crash: the files may have been replaced before it (an unchanged version registers nothing).
+  await appModule();
   if (force) {
     reportOutcome();
   }
+  if (crash !== undefined) {
+    stderr(`[project-updater] fatal: ${String(crash)}`);
+    return 1;
+  }
   return 0;
+}
+
+/** Reads the installed app-module now; the returned function registers it if it changed. Never throws, nothing silent. */
+function prepareAppModule(deps: UpdaterDeps): () => Promise<void> {
+  const unknown = (reason: string): (() => Promise<void>) => async () => {
+    deps.stderr(`[project-updater] app-core: not re-registering the app-module, ${reason}. Once fixed, run: project cli register`);
+  };
+  let manifestPath: string;
+  try {
+    manifestPath = join(deps.npmRootGlobal(), PKG_NAME, 'app-module', 'manifest.json');
+  } catch (error) {
+    return unknown(`the global npm folder is unknown (${error instanceof Error ? error.message : String(error)})`);
+  }
+  const before = deps.appModule.readVersion(manifestPath);
+  return async () => {
+    try {
+      await registerAfterUpdate({
+        manifestPath,
+        before,
+        readVersion: deps.appModule.readVersion,
+        register: deps.appModule.register,
+        log: (line) => deps.stdout(`[project-updater] ${line}`),
+      });
+    } catch (error) {
+      deps.stderr(`[project-updater] app-core: registration after the update failed (${error instanceof Error ? error.message : String(error)}). Run: project cli register`);
+    }
+  };
 }

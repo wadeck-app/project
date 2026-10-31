@@ -174,6 +174,11 @@ export interface Detail {
   git?: string;
   gitText: string;
   createdAt: string;
+  /** The identity as labelled lines: a badge shows a bare value without its meaning. */
+  idLine: string;
+  aliasesLine: string;
+  labelsLine: string;
+  gitLine: string;
   virtual: boolean;
   virtualText: string;
   parent: ProjectRef | null;
@@ -225,6 +230,10 @@ export function detailOf(registryDir: string, registry: Registry, project: Proje
     ...(project.git === undefined ? {} : { git: project.git }),
     gitText: project.git ?? 'none',
     createdAt: project.createdAt,
+    idLine: `ID: ${project.id}`,
+    aliasesLine: `Aliases: ${textOf(project.aliases, 'none')}`,
+    labelsLine: `Labels: ${textOf(labels, 'none')}`,
+    gitLine: `Git: ${project.git ?? 'none'}`,
     virtual: isVirtual(project),
     virtualText: isVirtual(project) ? 'virtual' : '',
     parent: parent === undefined ? null : refOf(parent),

@@ -36,5 +36,10 @@ fs.mkdirSync(path.join(sandbox, 'app-core-cli'), { recursive: true });
 fs.writeFileSync(path.join(sandbox, 'app-core-cli', 'config.yml'), 'autoUpdate: false\n');
 
 afterAll(() => {
-  fs.rmSync(sandbox, { recursive: true, force: true });
+  // Windows can refuse to remove a folder for a moment (antivirus, indexer): retry, and never fail a suite over a temp folder.
+  try {
+    fs.rmSync(sandbox, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  } catch (error) {
+    process.stderr.write(`[vitest.setup] could not remove ${sandbox}, delete it by hand (${error instanceof Error ? error.message : String(error)})\n`);
+  }
 });

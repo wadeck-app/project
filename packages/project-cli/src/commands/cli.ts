@@ -9,6 +9,7 @@ import { CliError } from '../errors.js';
 import { PACKAGE_NAME, UPDATER_BUNDLE_NAME, ownBundlePath } from '../ownBundle.js';
 import { selfChecks } from '../selfChecks.js';
 import { currentVersion } from '../version.js';
+import { registerCommand, unregisterCommand } from './appCore.js';
 
 /** A repo-built CLI (a version CI did not stamp) must never replace or roll back the global install. */
 function refuseDevBuild(): void {
@@ -102,4 +103,4 @@ const logsCommand: PlainCommand = {
   },
 };
 
-export const CLI_COMMANDS: PlainCommand[] = [versionCommand, updateCommand, rollbackCommand, selfCheckCommand, logsCommand];
+export const CLI_COMMANDS: PlainCommand[] = [versionCommand, updateCommand, rollbackCommand, selfCheckCommand, logsCommand, registerCommand, unregisterCommand];

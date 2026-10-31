@@ -95,8 +95,9 @@ export function makeWorld(): World {
       return normalizePath(path);
     },
     cleanup() {
-      rmSync(root, { recursive: true, force: true });
-      rmSync(registryDir, { recursive: true, force: true });
+      // Windows can refuse to remove a folder for a moment (antivirus, indexer): retry before failing.
+      rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+      rmSync(registryDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
     },
   };
 }

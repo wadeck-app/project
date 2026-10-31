@@ -111,7 +111,9 @@ isolate_env() {
   export XDG_CONFIG_HOME="$root/xdg"
   export HOME="$root/home"
   export USERPROFILE="$root/home"
-  mkdir -p "$npm_config_prefix" "$XDG_CONFIG_HOME/project" "$HOME"
+  # app-core's own config folder: `project cli register` leaves its pending registration there when app-core is not running.
+  export APP_CORE_CONFIG_DIR="$root/app-core"
+  mkdir -p "$npm_config_prefix" "$XDG_CONFIG_HOME/project" "$HOME" "$APP_CORE_CONFIG_DIR"
   echo "autoUpdate: false" > "$XDG_CONFIG_HOME/project/config.yml"
   # The global bin folder: the prefix itself on Windows, <prefix>/bin elsewhere. In git-bash PATH is a list of POSIX paths separated by
   # colons: a C:/ entry would be cut at its colon.
@@ -222,4 +224,27 @@ install_global() {
   done
   group_end
   fail "npm install -g $spec did not succeed after 6 attempts"
+}
+
+# --- the app-module -------------------------------------------------------------------------------------------------
+
+VERIFY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# The folder npm installed the package in.
+installed_package_dir() {
+  echo "$(npm root -g)/@wadeck-app/project-cli"
+}
+
+assert_file() {
+  local what="$1" file="$2"
+  [ -f "$file" ] || fail "$what: the file $file does not exist"
+  echo "ok: $what exists ($file)"
+}
+
+# A port where nothing listens, exported as APP_CORE_PORT: app-core is certainly "not running" for the next command.
+pick_free_port() {
+  local port
+  port="$(node "$VERIFY_LIB_DIR/free-port.mjs")" || fail "cannot find a free port"
+  export APP_CORE_PORT="$port"
+  echo "app-core is not running: APP_CORE_PORT=$port (nothing listens there)"
 }

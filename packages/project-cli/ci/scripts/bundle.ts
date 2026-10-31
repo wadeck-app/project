@@ -1,11 +1,12 @@
 /**
  * Bundles the project CLI and its updater into self-contained CommonJS files (the SDK and the shared libraries are inlined).
  * Bundles directly from the TypeScript sources (no prior tsc build required).
- * Output: dist-bundle/project.cjs and dist-bundle/project-updater.cjs
+ * Output: dist-bundle/project.cjs, dist-bundle/project-updater.cjs and dist-bundle/app-module/ (the packaged app-module-project)
  * Usage:  BUNDLE_VERSION=<version> npx tsx ci/scripts/bundle.ts
  */
 import { build } from 'esbuild';
-import { statSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { cpSync, existsSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -37,6 +38,19 @@ await Promise.all([
   build({ ...options, entryPoints: [path.join(root, 'src/main.ts')], outfile: path.join(root, 'dist-bundle/project.cjs') }),
   build({ ...options, entryPoints: [path.join(root, 'src/project-updater-entry.ts')], outfile: updaterFile }),
 ]);
+
+// The app-module is built by its own package: `npm run bundle` there runs `app-core-cli package` (backend bundle, views, packaged
+// manifest stamped with BUNDLE_VERSION). Only the resulting dist-module/ is copied next to project.cjs, where `project cli register`
+// and the updater look for it.
+const appModuleDir = path.join(root, '../app-module-project');
+const appModuleOutDir = path.join(root, 'dist-bundle/app-module');
+execSync('npm run bundle', { cwd: appModuleDir, env: { ...process.env, BUNDLE_VERSION: version }, stdio: 'inherit', windowsHide: true });
+const packagedModule = path.join(appModuleDir, 'dist-module');
+if (!existsSync(path.join(packagedModule, 'manifest.json'))) {
+  throw new Error(`app-module-project produced no ${packagedModule}/manifest.json: run "npm run bundle" in packages/app-module-project and read its output.`);
+}
+rmSync(appModuleOutDir, { recursive: true, force: true });
+cpSync(packagedModule, appModuleOutDir, { recursive: true });
 
 const updaterSize = statSync(updaterFile).size;
 if (updaterSize > MAX_UPDATER_SIZE) {

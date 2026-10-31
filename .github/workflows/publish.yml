@@ -44,8 +44,21 @@ jobs:
             - name: Build TypeScript
               run: npm run build
 
+            # The app-core module: layout, manifest and slots (the packaging itself runs in the publish job)
+            - name: Check the app-core module
+              run: npm run check
+
+            # The log is kept to put its end in an annotation: the job logs are not readable without admin rights
             - name: Run tests
-              run: npm test
+              shell: bash
+              run: |
+                  set -o pipefail
+                  npm test 2>&1 | tee "${{ runner.temp }}/tests.log"
+
+            - name: Annotate the failure of the tests
+              if: failure()
+              shell: bash
+              run: node packages/project-cli/ci/scripts/annotate-failure.mjs "tests (${{ matrix.os }})" "${{ runner.temp }}/tests.log"
 
     publish:
         needs: [build-and-test]
@@ -94,7 +107,7 @@ jobs:
                   BUNDLE_VERSION: ${{ steps.version.outputs.version }}
 
             - name: Generate platform package directories
-              run: bash packages/project-cli/ci/scripts/generate-platform-packages.sh project
+              run: bash packages/project-cli/ci/scripts/generate-platform-packages.sh project:app-module/
 
             - name: Copy artifacts to platform packages
               run: bash packages/project-cli/ci/scripts/copy-binaries.sh
@@ -169,11 +182,23 @@ jobs:
                   scope: '@wadeck-app'
 
             - name: Install the published version and check it works (install, --version, self-check, smoke test)
-              run: bash packages/project-cli/ci/scripts/verify-install.sh "${{ needs.publish.outputs.version }}"
+              run: |
+                  set -o pipefail
+                  bash packages/project-cli/ci/scripts/verify-install.sh "${{ needs.publish.outputs.version }}" 2>&1 | tee "${{ runner.temp }}/verify-install.log"
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+            - name: Annotate the failure of the install check
+              if: failure()
+              run: node packages/project-cli/ci/scripts/annotate-failure.mjs "verify-install (${{ matrix.os }})" "${{ runner.temp }}/verify-install.log"
+
             - name: Update from the previous published version, roll back, update again
-              run: bash packages/project-cli/ci/scripts/verify-update.sh "${{ needs.publish.outputs.version }}"
+              run: |
+                  set -o pipefail
+                  bash packages/project-cli/ci/scripts/verify-update.sh "${{ needs.publish.outputs.version }}" 2>&1 | tee "${{ runner.temp }}/verify-update.log"
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Annotate the failure of the update check
+              if: failure()
+              run: node packages/project-cli/ci/scripts/annotate-failure.mjs "verify-update (${{ matrix.os }})" "${{ runner.temp }}/verify-update.log"

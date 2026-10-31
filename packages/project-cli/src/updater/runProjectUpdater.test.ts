@@ -21,6 +21,8 @@ function makeDeps(overrides: Partial<UpdaterDeps> = {}) {
     now: () => 5000,
     stdout: (line) => out.push(line),
     stderr: (line) => err.push(line),
+    // These tests are about the update itself: no app-module in the install.
+    appModule: { readVersion: () => ({ absent: true }), register: async () => undefined },
     ...overrides,
   };
   return { deps, out, err, writtenStates };
@@ -37,12 +39,10 @@ describe('runProjectUpdater', () => {
     await expect((config as { onUpdateAvailable: (v: string) => Promise<unknown> }).onUpdateAvailable('2')).resolves.toBe('apply-now');
   });
 
-  it('keeps a self-check command given by the caller and does not look for npm', async () => {
-    const npmRootGlobal = vi.fn(() => '/never');
-    const { deps } = makeDeps({ env: { UPDATER_SELF_CHECK_CMD: 'custom check' }, npmRootGlobal });
+  it('keeps a self-check command given by the caller (npm is only asked for where the app-module is)', async () => {
+    const { deps } = makeDeps({ env: { UPDATER_SELF_CHECK_CMD: 'custom check' } });
     await runProjectUpdater(deps);
     expect(deps.env['UPDATER_SELF_CHECK_CMD']).toBe('custom check');
-    expect(npmRootGlobal).not.toHaveBeenCalled();
   });
 
   it('fails loudly, updates nothing and records the failure for the next command when npm root -g fails', async () => {

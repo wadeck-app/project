@@ -5,8 +5,9 @@
 # A row opens the detail page of the project (navigateTo, built by the route).
 $sources:
   projects:
-    url: GET /api/modules/project/projects?inlineErrors=true
+    url: GET /api/modules/project/projects
     params:
+      inlineErrors: 'true'
       label: $urlParam.label
       q: $urlParam.q
 

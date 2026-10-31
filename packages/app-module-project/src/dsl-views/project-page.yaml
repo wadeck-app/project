@@ -143,13 +143,13 @@ sections:
         gap: gap-1
         items:
           - $type: Badge
-            label: $sources.detail.project.id
+            label: $sources.detail.project.idLine
           - $type: Badge
-            label: $sources.detail.project.aliasesText
+            label: $sources.detail.project.aliasesLine
           - $type: Badge
-            label: $sources.detail.project.labelsText
+            label: $sources.detail.project.labelsLine
           - $type: Badge
-            label: $sources.detail.project.gitText
+            label: $sources.detail.project.gitLine
       - $type: Form
         onSubmit: $ctx.rename
         initialData: $sources.detail.forms.rename
@@ -377,7 +377,7 @@ sections:
         label: $sources.related.emptyText
         variant: info
       - $type: VerticalStack
-        $if: $sources.related.warnings
+        $if: $sources.related.warnings.length
         gap: gap-1
         items:
           - $type: DataTable

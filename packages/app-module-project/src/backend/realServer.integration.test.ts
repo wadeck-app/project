@@ -21,9 +21,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const fixtureDir = join(packageDir, 'src/backend/__fixtures__/contributor');
-const SERVER_START_TIMEOUT_MS = 30_000;
-const PACKAGE_TIMEOUT_MS = 60_000;
-const TEARDOWN_BUDGET_MS = 10_000;
+// Guards against a hang, never performance limits: a shared CI runner (Windows especially) can be several times slower than a laptop.
+const SERVER_START_TIMEOUT_MS = 120_000;
+const PACKAGE_TIMEOUT_MS = 240_000;
+const TEARDOWN_BUDGET_MS = 20_000;
 
 const cliPackageJson = createRequire(import.meta.url).resolve('@wadeck-app/app-core-cli/package.json');
 const cliEntry = join(dirname(cliPackageJson), 'dist/cli.bundle.js');
@@ -36,6 +37,8 @@ let env: NodeJS.ProcessEnv;
 let registryDir: string;
 let shopId: string;
 let shopFolder: string;
+// Everything the server printed: shown in the message of a failure, so that a CI log tells why.
+let serverOutput = '';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -69,12 +72,12 @@ function packageModule(source: string, out: string, extra: string[] = []): void 
 
 function startServer(builtModule: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    let output = '';
-    const timer = setTimeout(() => reject(new Error(`app-core-cli dev did not print its URL within ${SERVER_START_TIMEOUT_MS} ms. Output so far:\n${output}`)), SERVER_START_TIMEOUT_MS);
+    serverOutput = '';
+    const timer = setTimeout(() => reject(new Error(`app-core-cli dev did not print its URL within ${SERVER_START_TIMEOUT_MS} ms. Output so far:\n${serverOutput}`)), SERVER_START_TIMEOUT_MS);
     child = spawn(process.execPath, [cliEntry, 'dev', builtModule], { windowsHide: true, env });
     const onData = (chunk: Buffer): void => {
-      output += chunk.toString();
-      if (/app-core-cli dev: http:\/\/127\.0\.0\.1:\d+/.test(output)) {
+      serverOutput += chunk.toString();
+      if (/app-core-cli dev: http:\/\/127\.0\.0\.1:\d+/.test(serverOutput)) {
         clearTimeout(timer);
         resolve();
       }
@@ -87,7 +90,7 @@ function startServer(builtModule: string): Promise<void> {
     });
     child.on('exit', (code) => {
       clearTimeout(timer);
-      reject(new Error(`app-core-cli dev exited early (code ${code}). Output:\n${output}`));
+      reject(new Error(`app-core-cli dev exited early (code ${code}). Output:\n${serverOutput}`));
     });
   });
 }
@@ -110,11 +113,45 @@ async function waitPortFree(portToCheck: number, deadline: number): Promise<void
 }
 
 async function call(method: string, path: string, body?: unknown): Promise<{ status: number; body: any }> {
-  const response = await fetch(`${baseUrl}${path}`, {
-    method,
-    ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
-  });
-  return { status: response.status, body: await response.json() };
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method,
+      signal: AbortSignal.timeout(60_000),
+      ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+    });
+    const text = await response.text();
+    try {
+      return { status: response.status, body: JSON.parse(text) };
+    } catch {
+      throw new Error(`${method} ${path} answered ${response.status} with a body that is not JSON: ${text.slice(0, 300)}`);
+    }
+  } catch (error) {
+    throw new Error(`${method} ${path} failed: ${error instanceof Error ? error.message : String(error)}
+Output of the server:
+${serverOutput}`);
+  }
+}
+
+/** Waits until both modules are listed: registration and load are asynchronous, a slow runner needs time. */
+async function waitForModules(): Promise<void> {
+  const deadline = Date.now() + SERVER_START_TIMEOUT_MS;
+  let last = '';
+  while (Date.now() < deadline) {
+    try {
+      const { body } = await call('GET', '/api/modules');
+      const ids = body.modules.map((m: { id: string }) => m.id).sort();
+      last = JSON.stringify({ ids, failed: body.failed });
+      if (ids.join() === 'project,project-contributor') {
+        return;
+      }
+    } catch (error) {
+      last = error instanceof Error ? error.message : String(error);
+    }
+    await sleep(250);
+  }
+  throw new Error(`the modules were not both loaded within ${SERVER_START_TIMEOUT_MS} ms (last answer: ${last})
+Output of the server:
+${serverOutput}`);
 }
 
 const api = (path: string): string => `/api/modules/project${path}`;
@@ -155,9 +192,12 @@ describe('the packaged module through a real app-core server', () => {
     await startServer(join(providerFolder, 'dist-module'));
     const outcome = await registerModule({ id: 'project-contributor', manifestPath: join(contributorOut, 'manifest.json'), env });
     if (outcome.status !== 'registered') {
-      throw new Error(`the contributor fixture was not registered: ${JSON.stringify(outcome)}`);
+      throw new Error(`the contributor fixture was not registered: ${JSON.stringify(outcome)}
+Output of the server:
+${serverOutput}`);
     }
-  }, SERVER_START_TIMEOUT_MS + PACKAGE_TIMEOUT_MS * 2 + 15_000);
+    await waitForModules();
+  }, SERVER_START_TIMEOUT_MS * 2 + PACKAGE_TIMEOUT_MS * 2 + 15_000);
 
   afterAll(async () => {
     const deadline = Date.now() + TEARDOWN_BUDGET_MS;
@@ -172,7 +212,7 @@ describe('the packaged module through a real app-core server', () => {
     // Windows keeps handles on a folder for a moment after its process is gone: retry, then say which folder stays.
     for (let attempt = 0; ; attempt += 1) {
       try {
-        rmSync(workDir, { recursive: true, force: true });
+        rmSync(workDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
         return;
       } catch (error) {
         if (Date.now() >= deadline || attempt > 40) {
