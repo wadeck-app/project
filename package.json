@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspace=packages/project-sdk && npm run build --workspace=packages/project-cli && npm run build --workspace=packages/app-module-project",
-    "test": "npm run test --workspace=packages/project-sdk && npm run test --workspace=packages/project-cli && npm run test --workspace=packages/app-module-project",
+    "test": "vitest run --config test-support/vitest.config.ts && npm run test --workspace=packages/project-sdk && npm run test --workspace=packages/project-cli && npm run test --workspace=packages/app-module-project",
     "bundle": "npm run bundle --workspace=packages/project-cli",
     "build-launcher": "npm run build-launcher --workspace=packages/project-cli",
     "clean": "npm run clean --workspace=packages/project-sdk && npm run clean --workspace=packages/project-cli && npm run clean --workspace=packages/app-module-project",

@@ -190,6 +190,14 @@ describe('dsl-views', () => {
     }
   });
 
+  // The Count column shows `countText` (built by countTextOf): the page must not read the provider's raw `count`.
+  it('the Related table of the detail page shows countText and never the raw count of a provider', () => {
+    const page = readFileSync(join(viewsDir, 'project-page.yaml'), 'utf8');
+    expect(page).toContain("key: 'countText'");
+    expect(page).not.toMatch(/key: 'count'/);
+    expect(page).not.toContain('.count');
+  });
+
   it('the detail page embeds both slots, with the sources of the shell', () => {
     const page = readFileSync(join(viewsDir, 'project-page.yaml'), 'utf8');
     expect(page).toContain('url: GET /api/slots/project:project-links');

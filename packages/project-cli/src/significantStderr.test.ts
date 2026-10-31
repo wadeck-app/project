@@ -1,8 +1,11 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { bashCommand, removeTempDir, significantStderr } from './testHelpers.js';
+import { bashCommand, realEnvironment, realLogMentions, removeTempDir, significantStderr } from './testHelpers.js';
 
 describe('significantStderr (the stderr of a child process without the noise of npm and node)', () => {
   it('drops the warnings npm prints, whatever its config (setup-node writes an npmrc with an unknown key)', () => {
@@ -73,5 +76,42 @@ describe('bashCommand', () => {
 
   it('falls back to bash when Git is not where expected', () => {
     expect(bashCommand('win32', { ProgramFiles: '/fake/ProgramFiles' }, () => false)).toBe('bash');
+  });
+});
+
+describe('the few tests that look at the real machine (read-only) while the environment is redirected', () => {
+  it('realEnvironment gives the real values the guard recorded before the redirection, not the temp ones', () => {
+    const real = realEnvironment();
+    // On a machine without XDG_CONFIG_HOME the real value is simply absent; what matters is that it is not the redirected one.
+    expect(real['XDG_CONFIG_HOME']).not.toBe(process.env['XDG_CONFIG_HOME']);
+    expect(real['USERPROFILE'] ?? real['HOME']).toBeDefined();
+    expect(real['USERPROFILE'] ?? real['HOME']).not.toBe(process.env['HOME']);
+  });
+
+  it('realLogMentions reads the REAL log folder recorded by the guard, not the redirected registry folder', () => {
+    const fakeReal = fs.mkdtempSync(path.join(os.tmpdir(), 'project-cli-reallog-'));
+    const saved = process.env['PROJECT_TEST_REAL_CONFIG_DIR'];
+    try {
+      const day = new Date().toISOString().slice(0, 10);
+      fs.mkdirSync(path.join(fakeReal, 'logs'), { recursive: true });
+      fs.writeFileSync(path.join(fakeReal, 'logs', `${day}.ndjson`), 'a line with TOKEN-123');
+      process.env['PROJECT_TEST_REAL_CONFIG_DIR'] = fakeReal;
+      expect(realLogMentions('TOKEN-123')).toBe(true);
+      expect(realLogMentions('TOKEN-999')).toBe(false);
+    } finally {
+      if (saved === undefined) delete process.env['PROJECT_TEST_REAL_CONFIG_DIR'];
+      else process.env['PROJECT_TEST_REAL_CONFIG_DIR'] = saved;
+      removeTempDir(fakeReal);
+    }
+  });
+
+  it('fails loudly when the guard did not record the real folder (the test would otherwise look at the temp folder and always pass)', () => {
+    const saved = process.env['PROJECT_TEST_REAL_CONFIG_DIR'];
+    delete process.env['PROJECT_TEST_REAL_CONFIG_DIR'];
+    try {
+      expect(() => realLogMentions('x')).toThrow(/PROJECT_TEST_REAL_CONFIG_DIR/);
+    } finally {
+      process.env['PROJECT_TEST_REAL_CONFIG_DIR'] = saved;
+    }
   });
 });

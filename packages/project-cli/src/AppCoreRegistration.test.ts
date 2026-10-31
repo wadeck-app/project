@@ -16,6 +16,25 @@ beforeEach(() => {
   vi.resetAllMocks();
 });
 
+// EXPLICIT isolation of the whole file (on top of the shared setup of the repository): attemptUnregistration removes the staged copies of the module in
+// <registry folder>/app-module, and this file once ran it against the real ~/.config/project, which broke the module in the user's real app-core.
+let isolatedHome: string;
+let savedEnv: Record<string, string | undefined>;
+beforeEach(() => {
+  isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), 'project-cli-registration-'));
+  savedEnv = { XDG_CONFIG_HOME: process.env['XDG_CONFIG_HOME'], HOME: process.env['HOME'], USERPROFILE: process.env['USERPROFILE'] };
+  process.env['XDG_CONFIG_HOME'] = path.join(isolatedHome, 'xdg');
+  process.env['HOME'] = isolatedHome;
+  process.env['USERPROFILE'] = isolatedHome;
+});
+afterEach(() => {
+  for (const [name, value] of Object.entries(savedEnv)) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  removeTempDir(isolatedHome);
+});
+
 import {
   APP_CORE_MODULE_ID,
   attemptRegistration,

@@ -98,10 +98,18 @@ Unknown fields are ignored; a wrong type of a known field, or a `url` / `moreUrl
 
 | Status the module answers | Meaning | Effect |
 |---|---|---|
-| 200 | Data | Panel shown, with the count ("3 open") and a "partial list" note when `truncated` |
+| 200 | Data | Panel shown, with the count column below and a "partial list" note when `truncated` |
 | 404 | No such route | Module left out, not asked again for 60 s |
 | 409 | Not applicable to this project (e.g. a virtual project) | Module left out, not asked again for 60 s |
 | Other, timeout (2 s), invalid shape | Failure | Warning shown with the module name, asked again at the next request |
+
+| Provider sends | Count column shows |
+|---|---|
+| `count` and `countLabel` | "{count} {countLabel}", e.g. "3 open" |
+| `countLabel` only | "{number of items} {countLabel}" |
+| no `countLabel` | the number of items: "{n} items", or "{n} recent items" when `moreUrl` is present ("1 item" / "none" at the edges) |
+
+A `count` without a `countLabel` is **never displayed**, even when it equals the number of items: flow and queue send what needs attention as `count` and recent history as `items`, so a bare number next to a list is ambiguous. `countLabel` stays optional in the SDK contract.
 
 The 60 s memory is in the process, keyed by module id and project id. `GET /projects/:ref/related` asks every other installed module in parallel (the list comes from `GET /api/modules` of the same server, on `APP_CORE_PORT`, else the port app-core wrote, else 4850). It answers `{ projectId, hasPanels, panels, summary, rows, warnings, emptyText? }`; `panels` is sorted by module id and `warnings` entries are `{ module, text }`, never hidden.
 

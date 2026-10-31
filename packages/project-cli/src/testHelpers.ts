@@ -74,9 +74,40 @@ export function isolatedCliEnv(root: string): NodeJS.ProcessEnv {
 
 /** Size and mtime of the REAL global install of the CLI (what an update or a rollback would replace). Read-only; `missing` when it is not installed. */
 export function realGlobalInstallSnapshot(): string {
-  const globalRoot = execSync('npm root -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  // The real environment (APPDATA decides where the global npm folder is on Windows), not the redirected one.
+  const globalRoot = execSync('npm root -g', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: withRealEnvironment() }).trim();
   const file = join(globalRoot, '@wadeck-app', 'project-cli', 'package.json');
   return existsSync(file) ? `${statSync(file).size}:${statSync(file).mtimeMs}` : 'missing';
+}
+
+/**
+ * The real configuration folder of the developer, as recorded by the guard of the run (test-support/guardRealConfig.ts) BEFORE the environment of
+ * the tests was redirected. defaultRegistryDir(process.env) would answer with the temp folder and a check on it would always pass.
+ */
+export function realConfigFolder(): string {
+  const real = process.env['PROJECT_TEST_REAL_CONFIG_DIR'];
+  if (real === undefined || real === '') {
+    throw new Error('PROJECT_TEST_REAL_CONFIG_DIR is not set: the globalSetup guard of test-support/ must run (see globalSetup in vitest.config.ts); without it a check of the real folder would look at the temp one');
+  }
+  return real;
+}
+
+/** The REAL values (before the redirection) of the variables the isolation redirects, for a test that must look at the real machine read-only. */
+export function realEnvironment(): Record<string, string> {
+  const recorded = process.env['PROJECT_TEST_REAL_ENV'];
+  if (recorded === undefined) {
+    throw new Error('PROJECT_TEST_REAL_ENV is not set: the globalSetup guard of test-support/ must run (see globalSetup in vitest.config.ts)');
+  }
+  return JSON.parse(recorded) as Record<string, string>;
+}
+
+/** A copy of the environment of the process with the REAL values (before the redirection) of the redirected variables; those that were not set stay unset. */
+export function withRealEnvironment(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const copy = { ...env };
+  for (const name of ['XDG_CONFIG_HOME', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'APP_CORE_CONFIG_DIR', 'APP_CORE_PORT']) {
+    delete copy[name];
+  }
+  return { ...copy, ...realEnvironment() };
 }
 
 /**
@@ -84,7 +115,7 @@ export function realGlobalInstallSnapshot(): string {
  * used the real config folder; real sessions using the CLI at the same time cannot produce the token, which makes this free of races.
  */
 export function realLogMentions(token: string): boolean {
-  const configDir = defaultRegistryDir(process.env);
+  const configDir = realConfigFolder();
   return [0, 1].some((daysAgo) => {
     const day = new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10);
     const file = join(configDir, 'logs', `${day}.ndjson`);

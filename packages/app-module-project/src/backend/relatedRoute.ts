@@ -1,5 +1,6 @@
 import { defaultRegistryDir, loadRegistry } from '@wadeck-app/project-sdk';
 import { appCoreBaseUrl } from './appCore.js';
+import { countTextOf } from './countText.js';
 import { RequestError } from './httpError.js';
 import { NegativeCache, collectRelated } from './related.js';
 import { findLive } from './readRoutes.js';
@@ -35,7 +36,7 @@ export function registerRelatedRoute(kit: RouteKit): void {
       summary: panels.map((p) => ({
         module: p.module,
         title: p.title,
-        countText: [String(p.count ?? p.items?.length ?? 0), p.countLabel].filter((part) => part !== undefined).join(' '),
+        countText: countTextOf({ ...p, items: p.items ?? [] }),
         noteText: p.truncated === true ? 'partial list' : '',
         href: p.moreUrl ?? '',
       })),

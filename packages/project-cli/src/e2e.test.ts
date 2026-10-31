@@ -1,11 +1,11 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type Project, loadDeleted, loadRegistry, normalizePath, toNativePath, validateRegistry } from '@wadeck-app/project-sdk';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { isolatedCliEnv, removeTempDir, significantStderr } from './testHelpers.js';
+import { isolatedCliEnv, realConfigFolder, removeTempDir, significantStderr } from './testHelpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const entry = join(here, '..', 'dist', 'main.js');
@@ -226,7 +226,7 @@ describe('end-to-end: failures and isolation', () => {
   it('writes under XDG_CONFIG_HOME and never under the real default directory', async () => {
     const fresh = makeSandbox();
     try {
-      const realRegistry = join(homedir(), '.config', 'project', 'registry.json');
+      const realRegistry = join(realConfigFolder(), 'registry.json');
       const before = existsSync(realRegistry) ? readFileSync(realRegistry, 'utf8') : undefined;
       const result = await fresh.cli(['add', '--virtual', '--name', 'iso']);
       expect(result.code, result.stderr).toBe(0);
@@ -351,7 +351,7 @@ describe('end-to-end: the logs', () => {
   });
 
   it('never writes to the real config folder of the user', async () => {
-    const real = join(homedir(), '.config', 'project', 'logs', `${today()}.ndjson`);
+    const real = join(realConfigFolder(), 'logs', `${today()}.ndjson`);
     const sizeBefore = existsSync(real) ? statSync(real).size : undefined;
     await sandbox.cli(['list']);
     expect(existsSync(real) ? statSync(real).size : undefined).toBe(sizeBefore);
