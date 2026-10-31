@@ -1,0 +1,10 @@
+{
+  "name": "@wadeck-app/project-contributor-fixture",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "files": ["dist-module"],
+  "dependencies": {
+    "@wadeck-app/app-module-project": "*"
+  }
+}

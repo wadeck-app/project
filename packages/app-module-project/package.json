@@ -1,0 +1,35 @@
+{
+  "name": "@wadeck-app/app-module-project",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "files": [
+    "dist-module"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "check": "app-core-cli check .",
+    "bundle": "app-core-cli package .",
+    "test": "vitest run --bail=1",
+    "test:watch": "vitest",
+    "clean": "rimraf dist-module"
+  },
+  "dependencies": {
+    "@wadeck-app/project-sdk": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@wadeck-app/app-core-cli": "latest",
+    "@wadeck-app/app-core-sdk": "latest",
+    "@wadeck-app/dsl-renderer": "latest",
+    "@wadeck-app/dsl-ui": "latest",
+    "js-yaml": "^4.3.2",
+    "@types/js-yaml": "^4.0.9",
+    "rimraf": "^6.0.1",
+    "typescript": "^7.0.0",
+    "vitest": "^4.0.14"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

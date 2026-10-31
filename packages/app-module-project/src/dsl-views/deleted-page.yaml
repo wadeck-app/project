@@ -1,0 +1,56 @@
+# Trash (nav /deleted): the removed projects, and the restore form. Removing a project keeps its tool folders, so a restore brings
+# everything back. The restore of a child whose parent is still in the trash is refused with the way out (restore both with
+# "Also restore the descendants" on the parent); the refusal is shown as a toast with the server message.
+$sources:
+  deleted:
+    url: GET /api/modules/project/deleted?inlineErrors=true
+
+# {ref} is the project chosen in the select of the form.
+$actions:
+  restoreProject:
+    url: POST /api/modules/project/deleted/{ref}/restore
+    successMessage: Project restored
+    errorPrefix: Could not restore
+    reloadSources: true
+
+$type: PageContent
+sections:
+  - $type: PageHeader
+    title: Trash
+    subtitle: Removed projects. Restore one to bring it back with its folders.
+  - $type: Badge
+    $if: $sources.deleted.errorText
+    label: $sources.deleted.errorText
+    variant: danger
+  - $type: Badge
+    $if: $sources.deleted.emptyText
+    label: $sources.deleted.emptyText
+    variant: info
+  - $type: DataTable
+    $if: $sources.deleted.count
+    rows: $sources.deleted.projects
+    emptyMessage: The trash is empty
+    columns:
+      - { key: 'id', label: 'ID', mono: true, nowrap: true }
+      - { key: 'name', label: 'Name', nowrap: true }
+      - { key: 'aliasesText', label: 'Aliases' }
+      - { key: 'parentName', label: 'Parent', nowrap: true }
+      - { key: 'labelsText', label: 'Labels' }
+      - { key: 'deletedAt', label: 'Removed at', nowrap: true }
+  - $type: Form
+    $if: $sources.deleted.count
+    onSubmit: $ctx.restoreProject
+    initialData: {}
+    fields:
+      - $type: FieldSelect
+        label: Project to restore
+        bind: ref
+        options: $sources.deleted.options
+        placeholder: Choose a project
+        required: true
+      - $type: Switch
+        label: Also restore the descendants removed with it
+        bind: recursive
+    actions:
+      - $type: ButtonSave
+        label: Restore

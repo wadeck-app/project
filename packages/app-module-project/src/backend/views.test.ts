@@ -1,0 +1,165 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { load } from 'js-yaml';
+import { describe, expect, it } from 'vitest';
+import { makeModule } from './testKit.js';
+
+const packageDir = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const viewsDir = join(packageDir, 'src/dsl-views');
+
+interface Point {
+  kind: string;
+  slot: string;
+  path?: string;
+  label?: string;
+  view: { type: string; value: string };
+}
+const manifest = JSON.parse(readFileSync(join(packageDir, 'manifest.json'), 'utf8')) as {
+  id?: string;
+  expose?: { slots?: Record<string, { accepts: string[] }> };
+  extensionPoints: Point[];
+  [key: string]: unknown;
+};
+
+const viewFiles = readdirSync(viewsDir).filter((file) => /\.ya?ml$/.test(file));
+
+function parseView(file: string): Record<string, unknown> {
+  const parsed = load(readFileSync(join(viewsDir, file), 'utf8'));
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`${file} must hold a YAML mapping at its root`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
+/** Every value stored under `key` at any depth. */
+function collect(node: unknown, key: string, found: unknown[] = []): unknown[] {
+  if (Array.isArray(node)) {
+    node.forEach((child) => collect(child, key, found));
+  } else if (node !== null && typeof node === 'object') {
+    for (const [name, child] of Object.entries(node)) {
+      if (name === key) {
+        found.push(child);
+      }
+      collect(child, key, found);
+    }
+  }
+  return found;
+}
+
+describe('manifest.json', () => {
+  it('has the id project, no version (the packaging stamps it), no dslLib and no backend path (the packaging fixes it)', () => {
+    expect(manifest.id).toBe('project');
+    for (const key of ['version', 'dslLib', 'backendEntryPath']) {
+      expect(manifest, key).not.toHaveProperty(key);
+    }
+  });
+
+  it('declares the pages: Projects (/), Tree, Trash in the menu and /p/:project for the detail', () => {
+    expect(manifest.extensionPoints.map((p) => `${p.kind}:${p.slot}:${p.path}:${p.label}`)).toEqual([
+      'page:nav:/:Projects',
+      'page:nav:/tree:Tree',
+      'page:nav:/deleted:Trash',
+      'page:route:/p/:project:Project',
+    ]);
+  });
+
+  it('exposes the two slots with the types they accept', () => {
+    expect(manifest.expose?.slots).toEqual({
+      'project-panels': { accepts: ['Section', 'Collapsible', 'Badge', 'ButtonLink'] },
+      'project-links': { accepts: ['ButtonLink', 'IconButton', 'Badge'] },
+    });
+  });
+
+  it('references each view as ./src/dsl-views/<file>, each file exists, and every file of the folder is referenced', () => {
+    const referenced = manifest.extensionPoints.map((p) => p.view.value);
+    for (const value of referenced) {
+      expect(value).toMatch(/^\.\/src\/dsl-views\/[\w.-]+\.ya?ml$/);
+      expect(existsSync(join(packageDir, value)), value).toBe(true);
+    }
+    expect(referenced.map((v) => v.replace('./src/dsl-views/', '')).sort()).toEqual([...viewFiles].sort());
+  });
+});
+
+describe('dsl-views', () => {
+  it.each(viewFiles)('%s parses and has a $type', (file) => {
+    expect(parseView(file)['$type']).toEqual(expect.any(String));
+  });
+
+  it.each(viewFiles)('%s holds only keys the installed dsl-ui knows', async (file) => {
+    const require = createRequire(import.meta.url);
+    const walker = (await import('@wadeck-app/dsl-renderer/build/unknownKeys')) as {
+      findUnknownKeys: (doc: unknown, known: unknown) => { severity: string; message: string; nodePath: string }[];
+    };
+    const knownKeys = JSON.parse(readFileSync(require.resolve('@wadeck-app/dsl-ui/known-keys.json'), 'utf8')) as unknown;
+    const errors = walker.findUnknownKeys(parseView(file), knownKeys).filter((d) => d.severity === 'error');
+    expect(errors, errors.map((d) => `${d.nodePath} ${d.message}`).join('\n')).toEqual([]);
+  });
+
+  // Guards against a check that passes because it checks nothing (a renamed export, an empty key file).
+  it('the key check does flag an unknown key and an unknown component', async () => {
+    const require = createRequire(import.meta.url);
+    const walker = (await import('@wadeck-app/dsl-renderer/build/unknownKeys')) as {
+      findUnknownKeys: (doc: unknown, known: unknown) => { severity: string; message: string }[];
+    };
+    const knownKeys = JSON.parse(readFileSync(require.resolve('@wadeck-app/dsl-ui/known-keys.json'), 'utf8')) as unknown;
+    const found = walker.findUnknownKeys({ $type: 'PageContent', sections: [{ $type: 'Badge', label: 'x', colour: 'red' }, { $type: 'NoSuchThing' }] }, knownKeys);
+    expect(found.filter((d) => d.severity === 'error').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it.each(viewFiles)('%s is English and ASCII only (UI texts and comments)', (file) => {
+    const text = readFileSync(join(viewsDir, file), 'utf8');
+    // eslint-disable-next-line no-control-regex
+    expect(text.replace(/[\x00-\x7f]/g, '')).toBe('');
+  });
+
+  const routes = makeModule().routes;
+  const urlsOf = (file: string, key: '$sources' | '$actions'): { name: string; method: string; path: string; url: string }[] => {
+    const block = (parseView(file)[key] ?? {}) as Record<string, { url: string }>;
+    return Object.entries(block).map(([name, spec]) => {
+      const [method = '', rest = ''] = spec.url.split(' ');
+      return { name, method, path: rest.replace(/^\/api\/modules\/project/, '').split('?')[0]!, url: rest };
+    });
+  };
+  // `{ref}` and `{project}` stand for the :ref of the route.
+  const shape = (path: string): string => path.replace(/\{[^}]+\}/g, ':ref');
+
+  it.each(viewFiles)('%s: every source and action calls a route the module registers (same method, same shape)', (file) => {
+    const calls = [...urlsOf(file, '$sources'), ...urlsOf(file, '$actions')].filter((c) => c.url.startsWith('/api/modules/project'));
+    for (const call of calls) {
+      expect(routes, `${file} ${call.name}: ${call.method} ${call.path}`).toContain(`${call.method} ${shape(call.path)}`);
+    }
+  });
+
+  it.each(viewFiles)('%s: the sources of the module answer errors as data (inlineErrors), so that one failure does not blank the page', (file) => {
+    for (const source of urlsOf(file, '$sources').filter((c) => c.url.startsWith('/api/modules/project'))) {
+      expect(source.url, `${file} ${source.name}`).toContain('inlineErrors=true');
+    }
+  });
+
+  it.each(viewFiles)('%s: every action used by a form is declared, and every declared action is used', (file) => {
+    const document = parseView(file);
+    const declared = Object.keys((document['$actions'] ?? {}) as object);
+    const used = (collect(document, 'onSubmit') as string[]).map((value) => value.replace('$ctx.', ''));
+    expect([...new Set(used)].sort()).toEqual([...declared].sort());
+  });
+
+  it.each(viewFiles)('%s: an action that deletes or clears asks for a confirmation, and every action says its success and its failure', (file) => {
+    const actions = (parseView(file)['$actions'] ?? {}) as Record<string, { url: string; confirm?: string; successMessage?: string; errorPrefix?: string }>;
+    for (const [name, action] of Object.entries(actions)) {
+      expect(action.successMessage, `${file} ${name} successMessage`).toEqual(expect.any(String));
+      expect(action.errorPrefix, `${file} ${name} errorPrefix`).toEqual(expect.any(String));
+      if (action.url.startsWith('DELETE ')) {
+        expect(action.confirm, `${file} ${name} is a DELETE: it must have a confirm`).toEqual(expect.any(String));
+      }
+    }
+  });
+
+  it('the detail page embeds both slots, with the sources of the shell', () => {
+    const page = readFileSync(join(viewsDir, 'project-page.yaml'), 'utf8');
+    expect(page).toContain('url: GET /api/slots/project:project-links');
+    expect(page).toContain('url: GET /api/slots/project:project-panels');
+    expect(page.match(/\$type: ExtensionSlot/g)).toHaveLength(2);
+  });
+});

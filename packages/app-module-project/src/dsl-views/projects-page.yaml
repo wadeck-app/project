@@ -1,0 +1,87 @@
+# Projects (nav /): every project of the shared registry, filtered by a label selector and/or a text, and the form that adds one.
+# The two filters are URL parameters (SearchBar urlParam): ?label=state::*&q=shop. The label selector takes the same syntax as
+# `project list --label` (exact `key::value`, wildcard `state::*`). An invalid selector is answered as data (inlineErrors:
+# `errorText`), shown by a badge, and the page stays: a failing source would blank the whole page.
+# A row opens the detail page of the project (navigateTo, built by the route).
+$sources:
+  projects:
+    url: GET /api/modules/project/projects?inlineErrors=true
+    params:
+      label: $urlParam.label
+      q: $urlParam.q
+
+$actions:
+  addProject:
+    url: POST /api/modules/project/projects
+    successMessage: Project added
+    errorPrefix: Could not add the project
+    reloadSources: true
+
+$type: PageContent
+sections:
+  - $type: PageHeader
+    title: Projects
+    subtitle: The projects of the shared registry (the same ones as the `project` command line).
+  - $type: Badge
+    $if: $sources.projects.errorText
+    label: $sources.projects.errorText
+    variant: danger
+  - $type: Badge
+    $if: $sources.projects.emptyText
+    label: $sources.projects.emptyText
+    variant: info
+  - $type: HorizontalStack
+    gap: gap-3
+    align: items-center
+    items:
+      - $type: SearchBar
+        urlParam: label
+        placeholder: "Label selector, e.g. state::* or team::blue"
+      - $type: SearchBar
+        urlParam: q
+        placeholder: Text in the name, alias, id, label or path
+  - $type: DataTable
+    $if: $sources.projects.ready
+    rows: $sources.projects.projects
+    navigateTo: '{href}'
+    emptyMessage: No project matches the filters
+    columns:
+      - { key: 'id', label: 'ID', mono: true, nowrap: true }
+      - { key: 'name', label: 'Name', nowrap: true }
+      - { key: 'aliasesText', label: 'Aliases' }
+      - { key: 'parentName', label: 'Parent', nowrap: true }
+      - { key: 'labelsText', label: 'Labels' }
+      - { key: 'mainPathText', label: 'Main path', truncate: true, title: '{mainPathText}' }
+      - { key: 'virtualText', label: '', nowrap: true }
+  - $type: Collapsible
+    title: Add a project
+    items:
+      - $type: Form
+        $if: $sources.projects.ready
+        onSubmit: $ctx.addProject
+        initialData: {}
+        fields:
+          - $type: FieldText
+            label: Name
+            bind: name
+            required: true
+          - $type: FieldText
+            label: Folder (an existing folder; leave empty for a virtual project)
+            bind: path
+          - $type: FieldText
+            label: Aliases (separated by spaces or commas)
+            bind: aliases
+          - $type: FieldText
+            label: Labels (separated by spaces or commas, e.g. state::production team::blue)
+            bind: labels
+          - $type: FieldSelect
+            label: Parent
+            bind: parent
+            options: $sources.projects.parentOptions
+            placeholder: No parent
+          - $type: FieldText
+            label: Git url
+            bind: git
+        actions:
+          - $type: ButtonSave
+            label: Add the project

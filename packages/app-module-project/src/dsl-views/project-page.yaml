@@ -1,0 +1,423 @@
+# Project (route /p/:project, :project = $route.project: the id, a name or an alias): everything about one project and every change
+# of it. The module is the only UI that writes the registry, always through the project SDK (one lock, atomic file).
+#
+# Conventions
+# - Every source answers 200 with `errorText` on failure (inlineErrors): a failing source would blank the whole page.
+# - Every form is bound to the project by `ref` (the id, in the initialData that the route builds: `forms.*`); the actions put it
+#   in their address ({ref}). The installed shell does not fill {key} of a row action, so removals are done by choosing the value in a select.
+# - A refused change is shown by the shell as a toast with the message of the route (the SDK message and what to do).
+# - Destructive actions ask for a confirmation first.
+#
+# Extension points (declared in manifest.json `expose`, contract in README.md):
+# - project:project-links  links/buttons about THIS project (root: ButtonLink, IconButton, Badge)
+# - project:project-panels sections about THIS project (root: Section, Collapsible, Badge, ButtonLink)
+# A contribution cannot declare `$sources` (ignored); it reads this page's data (`$sources.detail.project.*`) and `$route.project`.
+# The "Related" section below is filled by the other modules through the convention GET /api/modules/<id>/related/project/<projectId>.
+$sources:
+  detail:
+    url: GET /api/modules/project/projects/{project}?inlineErrors=true
+    params:
+      project: $route.project
+  related:
+    url: GET /api/modules/project/projects/{project}/related?inlineErrors=true
+    params:
+      project: $route.project
+  links:
+    url: GET /api/slots/project:project-links
+  panels:
+    url: GET /api/slots/project:project-panels
+
+$actions:
+  rename:
+    url: PUT /api/modules/project/projects/{ref}/name
+    successMessage: Project renamed
+    errorPrefix: Could not rename
+    reloadSources: true
+  addAlias:
+    url: POST /api/modules/project/projects/{ref}/aliases
+    successMessage: Alias added
+    errorPrefix: Could not add the alias
+    reloadSources: true
+  removeAlias:
+    url: DELETE /api/modules/project/projects/{ref}/aliases
+    confirm: Remove this alias?
+    successMessage: Alias removed
+    errorPrefix: Could not remove the alias
+    reloadSources: true
+  addLabels:
+    url: POST /api/modules/project/projects/{ref}/labels
+    successMessage: Labels added
+    errorPrefix: Could not add the labels
+    reloadSources: true
+  removeLabels:
+    url: DELETE /api/modules/project/projects/{ref}/labels
+    confirm: Remove this label?
+    successMessage: Label removed
+    errorPrefix: Could not remove the label
+    reloadSources: true
+  setParent:
+    url: PUT /api/modules/project/projects/{ref}/parent
+    successMessage: Parent changed
+    errorPrefix: Could not change the parent
+    reloadSources: true
+  clearParent:
+    url: DELETE /api/modules/project/projects/{ref}/parent
+    confirm: Remove the parent of this project?
+    successMessage: Parent cleared
+    errorPrefix: Could not clear the parent
+    reloadSources: true
+  setGit:
+    url: PUT /api/modules/project/projects/{ref}/git
+    successMessage: Git url changed
+    errorPrefix: Could not change the git url
+    reloadSources: true
+  clearGit:
+    url: DELETE /api/modules/project/projects/{ref}/git
+    confirm: Clear the git url of this project?
+    successMessage: Git url cleared
+    errorPrefix: Could not clear the git url
+    reloadSources: true
+  addPath:
+    url: POST /api/modules/project/projects/{ref}/paths
+    successMessage: Path added
+    errorPrefix: Could not add the path
+    reloadSources: true
+  removePath:
+    url: DELETE /api/modules/project/projects/{ref}/paths
+    confirm: Remove this path from the project? The folder itself is not touched.
+    successMessage: Path removed
+    errorPrefix: Could not remove the path
+    reloadSources: true
+  movePath:
+    url: PUT /api/modules/project/projects/{ref}/paths
+    successMessage: Path moved
+    errorPrefix: Could not move the path
+    reloadSources: true
+  setMain:
+    url: PUT /api/modules/project/projects/{ref}/main
+    successMessage: Main path changed
+    errorPrefix: Could not change the main path
+    reloadSources: true
+  removeProject:
+    url: DELETE /api/modules/project/projects/{ref}
+    confirm: Remove this project? It goes to the trash and can be restored; its tool folders are kept.
+    successMessage: Project removed (it is in the trash)
+    errorPrefix: Could not remove the project
+    reloadSources: true
+
+$type: PageContent
+sections:
+  - $type: PageHeader
+    title: $sources.detail.project.name
+    subtitle: $sources.detail.project.chainText
+  - $type: Badge
+    $if: $sources.detail.errorText
+    label: $sources.detail.errorText
+    variant: danger
+  - $type: Badge
+    $if: $sources.detail.project.warningsText
+    label: $sources.detail.project.warningsText
+    variant: warning
+  - $type: Badge
+    $if: $sources.detail.project.virtualText
+    label: Virtual project (no folder)
+    variant: info
+  # Extension point project:project-links.
+  - $type: HorizontalStack
+    $if: $sources.detail.project
+    gap: gap-2
+    items:
+      - $type: ExtensionSlot
+        items: $sources.links
+  - $type: ButtonLink
+    $if: $sources.detail.project.parent
+    label: Open the parent project
+    to: $sources.detail.project.parent.href
+    size: sm
+
+  - $type: Section
+    $if: $sources.detail.project
+    title: Identity
+    items:
+      - $type: VerticalStack
+        gap: gap-1
+        items:
+          - $type: Badge
+            label: $sources.detail.project.id
+          - $type: Badge
+            label: $sources.detail.project.aliasesText
+          - $type: Badge
+            label: $sources.detail.project.labelsText
+          - $type: Badge
+            label: $sources.detail.project.gitText
+      - $type: Form
+        onSubmit: $ctx.rename
+        initialData: $sources.detail.forms.rename
+        fields:
+          - $type: FieldText
+            label: Name
+            bind: name
+            required: true
+        actions:
+          - $type: ButtonSave
+            label: Rename
+      - $type: Form
+        onSubmit: $ctx.addAlias
+        initialData: $sources.detail.forms.empty
+        fields:
+          - $type: FieldText
+            label: New alias
+            bind: alias
+            required: true
+        actions:
+          - $type: ButtonSave
+            label: Add the alias
+      - $type: Form
+        $if: $sources.detail.options.aliases.length
+        onSubmit: $ctx.removeAlias
+        initialData: $sources.detail.forms.empty
+        fields:
+          - $type: FieldSelect
+            label: Alias to remove
+            bind: alias
+            options: $sources.detail.options.aliases
+            placeholder: Choose an alias
+            required: true
+        actions:
+          - $type: ButtonSave
+            label: Remove the alias
+      - $type: Form
+        onSubmit: $ctx.addLabels
+        initialData: $sources.detail.forms.empty
+        fields:
+          - $type: FieldText
+            label: Labels to add (separated by spaces or commas, e.g. state::production team::blue)
+            bind: labels
+            required: true
+        actions:
+          - $type: ButtonSave
+            label: Add the labels
+      - $type: Form
+        $if: $sources.detail.options.labels.length
+        onSubmit: $ctx.removeLabels
+        initialData: $sources.detail.forms.empty
+        fields:
+          - $type: FieldSelect
+            label: Label to remove
+            bind: labels
+            options: $sources.detail.options.labels
+            placeholder: Choose a label
+            required: true
+        actions:
+          - $type: ButtonSave
+            label: Remove the label
+      - $type: Form
+        onSubmit: $ctx.setGit
+        initialData: $sources.detail.forms.git
+        fields:
+          - $type: FieldText
+            label: Git url
+            bind: git
+            required: true
+        actions:
+          - $type: ButtonSave
+            label: Set the git url
+      - $type: Form
+        $if: $sources.detail.project.git
+        onSubmit: $ctx.clearGit
+        initialData: $sources.detail.forms.empty
+        fields: []
+        actions:
+          - $type: ButtonSave
+            label: Clear the git url
+
+  - $type: Section
+    $if: $sources.detail.project
+    title: Hierarchy
+    items:
+      - $type: DataTable
+        $if: $sources.detail.project.hasChildren
+        rows: $sources.detail.project.children
+        navigateTo: '{href}'
+        emptyMessage: No child
+        columns:
+          - { key: 'name', label: 'Children', nowrap: true }
+          - { key: 'id', label: 'ID', mono: true, nowrap: true }
+          - { key: 'virtualText', label: '', nowrap: true }
+      - $type: DataTable
+        $if: $sources.detail.project.descendantsCount
+        rows: $sources.detail.project.descendants
+        navigateTo: '{href}'
+        emptyMessage: No descendant
+        columns:
+          - { key: 'name', label: 'All descendants', nowrap: true }
+          - { key: 'parentName', label: 'Parent', nowrap: true }
+          - { key: 'id', label: 'ID', mono: true, nowrap: true }
+      - $type: Form
+        onSubmit: $ctx.setParent
+        initialData: $sources.detail.forms.parent
+        fields:
+          - $type: FieldSelect
+            label: Parent
+            bind: parent
+            options: $sources.detail.options.parents
+            placeholder: Choose a parent
+            required: true
+        actions:
+          - $type: ButtonSave
+            label: Set the parent
+      - $type: Form
+        $if: $sources.detail.project.parent
+        onSubmit: $ctx.clearParent
+        initialData: $sources.detail.forms.empty
+        fields: []
+        actions:
+          - $type: ButtonSave
+            label: Remove the parent
+
+  - $type: Section
+    $if: $sources.detail.project
+    title: Folders
+    items:
+      - $type: Badge
+        $if: $sources.detail.project.virtualText
+        label: No folder is registered (virtual project). Add one below.
+        variant: info
+      - $type: DataTable
+        $if: $sources.detail.project.hasPaths
+        rows: $sources.detail.project.paths
+        emptyMessage: No folder
+        columns:
+          - { key: 'pathText', label: 'Path', mono: true, truncate: true, title: '{pathText}' }
+          - { key: 'mainText', label: '', nowrap: true }
+      - $type: Badge
+        label: $sources.detail.project.toolFoldersText
+      - $type: Form
+        onSubmit: $ctx.addPath
+        initialData: $sources.detail.forms.empty
+        fields:
+          - $type: FieldText
+            label: Folder to add (an existing folder)
+            bind: path
+            required: true
+          - $type: Switch
+            label: Make it the main folder
+            bind: main
+        actions:
+          - $type: ButtonSave
+            label: Add the folder
+      - $type: Form
+        $if: $sources.detail.options.otherPaths.length
+        onSubmit: $ctx.setMain
+        initialData: $sources.detail.forms.empty
+        fields:
+          - $type: FieldSelect
+            label: New main folder
+            bind: path
+            options: $sources.detail.options.otherPaths
+            placeholder: Choose a folder
+            required: true
+        actions:
+          - $type: ButtonSave
+            label: Make it the main folder
+      - $type: Form
+        $if: $sources.detail.options.paths.length
+        onSubmit: $ctx.movePath
+        initialData: $sources.detail.forms.empty
+        fields:
+          - $type: FieldSelect
+            label: Folder that moved
+            bind: from
+            options: $sources.detail.options.paths
+            placeholder: Choose a folder
+            required: true
+          - $type: FieldText
+            label: Its new location (an existing folder)
+            bind: to
+            required: true
+        actions:
+          - $type: ButtonSave
+            label: Move the folder
+      - $type: Form
+        $if: $sources.detail.options.paths.length
+        onSubmit: $ctx.removePath
+        initialData: $sources.detail.forms.empty
+        fields:
+          - $type: FieldSelect
+            label: Folder to remove
+            bind: path
+            options: $sources.detail.options.paths
+            placeholder: Choose a folder
+            required: true
+          - $type: FieldSelect
+            $if: $sources.detail.options.otherPaths.length
+            label: New main folder (needed when removing the main folder)
+            bind: newMain
+            options: $sources.detail.options.otherPaths
+            placeholder: Keep the current main folder
+        actions:
+          - $type: ButtonSave
+            label: Remove the folder
+
+  # Extension point project:project-panels.
+  - $type: ExtensionSlot
+    $if: $sources.detail.project
+    items: $sources.panels
+
+  - $type: Section
+    $if: $sources.detail.project
+    title: Related
+    items:
+      - $type: Badge
+        $if: $sources.related.errorText
+        label: $sources.related.errorText
+        variant: warning
+      - $type: Badge
+        $if: $sources.related.emptyText
+        label: $sources.related.emptyText
+        variant: info
+      - $type: VerticalStack
+        $if: $sources.related.warnings
+        gap: gap-1
+        items:
+          - $type: DataTable
+            rows: $sources.related.warnings
+            emptyMessage: No warning
+            columns:
+              - { key: 'text', label: 'Modules that could not answer' }
+      - $type: DataTable
+        $if: $sources.related.hasPanels
+        rows: $sources.related.summary
+        navigateTo: '{href}'
+        emptyMessage: Nothing related
+        columns:
+          - { key: 'module', label: 'Module', nowrap: true }
+          - { key: 'title', label: 'What' }
+          - { key: 'countText', label: 'Count', nowrap: true }
+      - $type: DataTable
+        $if: $sources.related.hasPanels
+        rows: $sources.related.rows
+        navigateTo: '{href}'
+        emptyMessage: Nothing related
+        columns:
+          - { key: 'panel', label: 'What', nowrap: true }
+          - { key: 'label', label: 'Item' }
+          - { key: 'subtitle', label: '' }
+
+  - $type: Section
+    $if: $sources.detail.project
+    title: Remove
+    items:
+      - $type: Form
+        onSubmit: $ctx.removeProject
+        initialData: $sources.detail.forms.empty
+        fields:
+          - $type: Switch
+            $if: $sources.detail.project.hasChildren
+            label: Also remove the descendants (required when the project has children)
+            bind: recursive
+        actions:
+          - $type: ButtonAction
+            label: Remove the project
+            variant: danger
+            type: submit

@@ -1,0 +1,37 @@
+# Tree (nav /tree): the hierarchy of the projects, children indented under their parent (a virtual project, one without a folder,
+# is marked). TreeView is not used: its selection is a callback, which YAML cannot express, so rows could not navigate; the
+# indentation is drawn by the route (treeLabel). A row opens the detail page. A registry edited by hand (a parent that does not
+# exist, a parent cycle) is shown anyway, with a warning badge.
+$sources:
+  tree:
+    url: GET /api/modules/project/tree?inlineErrors=true
+
+$type: PageContent
+sections:
+  - $type: PageHeader
+    title: Project tree
+    subtitle: Each project under its parent. Open a project to change it.
+  - $type: Badge
+    $if: $sources.tree.errorText
+    label: $sources.tree.errorText
+    variant: danger
+  - $type: Badge
+    $if: $sources.tree.warningsText
+    label: $sources.tree.warningsText
+    variant: warning
+  - $type: Badge
+    $if: $sources.tree.emptyText
+    label: $sources.tree.emptyText
+    variant: info
+  - $type: DataTable
+    $if: $sources.tree.rows
+    rows: $sources.tree.rows
+    navigateTo: '{href}'
+    emptyMessage: No project
+    columns:
+      - { key: 'treeLabel', label: 'Project', mono: true, nowrap: true }
+      - { key: 'id', label: 'ID', mono: true, nowrap: true }
+      - { key: 'virtualText', label: '', nowrap: true }
+      - { key: 'aliasesText', label: 'Aliases' }
+      - { key: 'labelsText', label: 'Labels' }
+      - { key: 'mainPathText', label: 'Main path', truncate: true, title: '{mainPathText}' }

@@ -1,0 +1,4 @@
+# A link for project:project-links, built from the route of the host page.
+$type: ButtonLink
+label: Contributor link
+to: /modules/project-contributor/items?project=$route.project

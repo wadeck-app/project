@@ -1,0 +1,18 @@
+{
+  "id": "project-contributor",
+  "requires": { "project": "*" },
+  "extensionPoints": [
+    {
+      "kind": "widget",
+      "slot": "project:project-panels",
+      "label": "Contributor panel",
+      "view": { "type": "path", "value": "./src/dsl-views/panel.yaml" }
+    },
+    {
+      "kind": "widget",
+      "slot": "project:project-links",
+      "label": "Contributor link",
+      "view": { "type": "path", "value": "./src/dsl-views/link.yaml" }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+# A panel for project:project-panels. A contribution reads the data of the host page: $sources.detail.project.* and $route.project.
+$type: Section
+title: Contributor panel
+items:
+  - $type: Badge
+    label: $sources.detail.project.name
+    variant: info
+  - $type: ButtonLink
+    label: Items of this project
+    to: /modules/project-contributor/items?project=$route.project
