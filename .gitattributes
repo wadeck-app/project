@@ -1,0 +1,2 @@
+# Same line endings on every OS: shell scripts break with CRLF (git-bash), and test fixtures compare text.
+* text=auto eol=lf

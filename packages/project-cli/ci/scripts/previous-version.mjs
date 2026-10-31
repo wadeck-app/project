@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * The published version just before a given one, for the update test of the CI (verify-update.sh).
  * Run locally:  npm view @wadeck-app/project-cli versions --json | node ci/scripts/previous-version.mjs <version>
