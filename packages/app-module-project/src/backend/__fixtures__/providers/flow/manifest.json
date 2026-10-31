@@ -1,0 +1,45 @@
+{
+  "id": "flow",
+  "expose": {
+    "slots": {
+      "execution-project-header": {
+        "accepts": [
+          "ButtonLink",
+          "IconButton",
+          "Badge",
+          "Link"
+        ]
+      },
+      "executions-project-header": {
+        "accepts": [
+          "ButtonLink",
+          "IconButton",
+          "Badge",
+          "Link"
+        ]
+      }
+    }
+  },
+  "extensionPoints": [
+    {
+      "kind": "page",
+      "slot": "nav",
+      "label": "Executions",
+      "path": "/executions",
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/executions.yaml"
+      }
+    },
+    {
+      "kind": "page",
+      "slot": "route",
+      "label": "Execution",
+      "path": "/executions/:id",
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/execution.yaml"
+      }
+    }
+  ]
+}

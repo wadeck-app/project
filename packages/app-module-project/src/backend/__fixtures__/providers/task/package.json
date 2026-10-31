@@ -1,0 +1,9 @@
+{
+  "name": "@wadeck-app/project-provider-fixture-task",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "files": [
+    "dist-module"
+  ]
+}

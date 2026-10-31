@@ -65,6 +65,10 @@ describe('ci/scripts/verify-lib.sh: helpers for the app-module check', () => {
     expect(update).toContain('did NOT register');
     expect(update).toContain('cli register --json');
     expect(update).toContain('registers the app-module again');
+    // The registration is done by the updater being replaced: the pending file is only asserted when that updater carries the marker.
+    expect(update).toContain('MARKER="reregister-on-update:v1"');
+    expect(update).toContain('SKIPPED');
+    expect(update).toContain('PREVIOUS_RE_REGISTERS');
     expect(update.indexOf('(e2b)')).toBeLessThan(update.indexOf('(e2c)'));
     expect(update.indexOf('(e2c)')).toBeLessThan(update.indexOf('(e4)'));
     expect(update.indexOf('pick_free_port')).toBeLessThan(update.indexOf('update_to "$VERSION"'));

@@ -1,0 +1,9 @@
+# Contribution to task:project-header (task pages of one project: /tasks/p/:project, a task, /tree/p/:project).
+# Host context: $route.project = the 8-hex id of the project. Shown only when the host has a project.
+# The address is fixed: a prop is an expression only when it is ONE path ("$route.project"); "/modules/project/p/$route.project" would be
+# followed as it is (href="/modules/project/p/$route.project", seen in a browser). Until a host gives a ready-made address, the link opens
+# the registry. A contributed node has no $sources of its own.
+$type: ButtonLink
+$if: $route.project
+label: Projects
+to: /modules/project/

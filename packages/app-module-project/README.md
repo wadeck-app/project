@@ -54,9 +54,11 @@ app-core listens on the loopback only, but a page of another site open in the sa
 
 A client that is not a browser sends no `Origin` and passes if it sends the other two. Read routes are unchanged.
 
-## Slots (future optional contributions)
+## Slots
 
-The detail page embeds two `ExtensionSlot`s so that other modules can add to it, without this module depending on them (it does not `require` any contributor). app-core is getting an optional-contribution feature; until it is there, a contributor must list `"requires": { "project": "*" }`. A contribution is an `extensionPoints` entry `{ "kind": "widget", "slot": "project:<slot>", "view": ... }`.
+### What other modules can add to the project page
+
+The detail page embeds two `ExtensionSlot`s. A contributor lists `"requires": { "project": "*" }` (or `optionalRequires` if it works without this module) and adds an `extensionPoints` entry `{ "kind": "widget", "slot": "project:<slot>", "view": ... }`.
 
 | Slot id | Accepted root `$type` | Use |
 |---|---|---|
@@ -64,6 +66,25 @@ The detail page embeds two `ExtensionSlot`s so that other modules can add to it,
 | `project:project-panels` | `Section`, `Collapsible`, `Badge`, `ButtonLink` | A section about the project |
 
 Host context: a contribution is rendered with the data of the detail page. Available: `$route.project` (the address segment: id, name or alias) and `$sources.detail.project.*` (`id`, `name`, `aliases`, `labels`, `git`, `parent`, `paths`, ...; see `GET /projects/:ref`). A `$sources` on the contributed node is ignored by app-core: to show data of your own module, use the Related contract below, or a `dslLib` component. Example fixture: `src/backend/__fixtures__/contributor`.
+
+### What this module adds to the pages of others (`optionalRequires`)
+
+`manifest.json` has `"optionalRequires": { "task": "*", "queue": "*", "flow": "*" }` and **never `requires`**: this module works without any of them. A contribution to a module that is not loaded is **inactive** (`GET /api/modules` gives the module a `warnings` list and the extension point an `inactive` reason; app-core logs it once); it activates when the provider loads, even later, and deactivates when it goes away. Nobody is unloaded either way.
+
+| Slot | Accepts | Host context used | Shown when |
+|---|---|---|---|
+| `task:project-header` | `ButtonLink`, `IconButton`, `Badge` | `$route.project` | the page is the page of a project |
+| `queue:project-header` | `Badge`, `Link`, `ButtonLink` | `$sources.projectScope` = `{ id, name, found }` | `found` is true |
+| `flow:execution-project-header` | `ButtonLink`, `IconButton`, `Badge`, `Link` | `$sources.execution.projectId` | the execution has a project (old ones do not) |
+| `flow:executions-project-header` | same | only the URL parameter `project` | **no contribution**, see below |
+
+What a contributed node can and cannot do (checked in a browser against fixtures of the hosts, `src/backend/__fixtures__/providers`):
+
+- `$if` on a host path works, and so does a label read from a host source (`label: $sources.execution.projectLabel`).
+- A prop is an expression only when the WHOLE value is one path (`to: $sources.x.href`). A path inside a string is **not** interpolated: `to: /modules/project/p/$route.project` is followed as it is. A contribution therefore cannot build `/modules/project/p/<id>`: the three links go to the project registry (`/modules/project/`, label "Projects"). To open the page of the project, a host must give a ready-made address in one of its sources (a whole value).
+- `$urlParam.*` is not in the context of a contributed node (the link never rendered): `flow:executions-project-header` has nothing to read, so nothing is contributed there until the host copies the value into a source.
+
+**Independence is guarded**: `src/backend/contributions.test.ts` fails if `manifest.json` gets a `requires`, if `optionalRequires` is not exactly task/queue/flow, if a widget targets a module that is not in `optionalRequires`, or if `package.json` lists a provider. `src/backend/optional.integration.test.ts` loads the module in a real app-core without any provider (it loads, warns, works), then loads fixtures of the providers one by one (each activates its contributions) and removes one (it deactivates, nothing is unloaded). `app-core-cli check` / `package` print one warning per provider they cannot find and exit 0; they only find a provider listed in `package.json` (`--link` is keyed by the package name), so the test validates the root `$type`s against the slots on a copy of the module that lists them, including the real built modules of task, queue and flow when their repositories are next to this one.
 
 ## Related
 

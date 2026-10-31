@@ -1,0 +1,26 @@
+{
+  "id": "queue",
+  "expose": {
+    "slots": {
+      "project-header": {
+        "accepts": [
+          "Badge",
+          "Link",
+          "ButtonLink"
+        ]
+      }
+    }
+  },
+  "extensionPoints": [
+    {
+      "kind": "page",
+      "slot": "nav",
+      "label": "Events",
+      "path": "/events",
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/events.yaml"
+      }
+    }
+  ]
+}

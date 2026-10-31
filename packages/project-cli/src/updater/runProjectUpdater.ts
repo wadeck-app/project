@@ -7,6 +7,13 @@ import { selfCheckCommand } from './selfCheckCommand.js';
 
 export const PKG_NAME = '@wadeck-app/project-cli';
 
+/**
+ * What this updater knows how to do, written in the log file at each decision and therefore present in the bundle: the install check
+ * (ci/scripts/verify-update.sh) greps the updater of the PREVIOUS version for it, because it is that updater, not the new one, that
+ * registers after an update.
+ */
+export const UPDATER_CAPABILITIES = 'reregister-on-update:v1';
+
 /** What the updater needs to tell app-core about new pages (fakes in tests, the real files and the app-core SDK in the entry point). */
 export interface AppModuleDeps {
   readVersion: (manifestPath: string) => AppModuleVersion;
@@ -33,6 +40,8 @@ export interface UpdaterDeps {
   now: () => number;
   stdout: (line: string) => void;
   stderr: (line: string) => void;
+  /** A line of the log file of the CLI (<registry folder>/logs/YYYY-MM-DD.ndjson), the same one as the update messages. */
+  appendLog: (level: 'info' | 'warn' | 'error', text: string) => void;
   appModule: AppModuleDeps;
 }
 
@@ -98,16 +107,21 @@ export async function runProjectUpdater(deps: UpdaterDeps): Promise<number> {
 /** Reads the installed app-module now; the returned function registers it if it changed. Never throws, nothing silent. */
 function prepareAppModule(deps: UpdaterDeps): () => Promise<void> {
   const unknown = (reason: string): (() => Promise<void>) => async () => {
-    deps.stderr(`[project-updater] app-core: not re-registering the app-module, ${reason}. Once fixed, run: project cli register`);
+    const text = `app-core: not re-registering the app-module, ${reason}. Once fixed, run: project cli register`;
+    deps.stderr(`[project-updater] ${text}`);
+    deps.appendLog('warn', text);
   };
   let manifestPath: string;
   try {
-    manifestPath = join(deps.npmRootGlobal(), PKG_NAME, 'app-module', 'manifest.json');
+    // trim(): `npm root -g` answers with a line break (execNpm returns it as it is), which made the path of the manifest wrong for every real run.
+    manifestPath = join(deps.npmRootGlobal().trim(), PKG_NAME, 'app-module', 'manifest.json');
   } catch (error) {
     return unknown(`the global npm folder is unknown (${error instanceof Error ? error.message : String(error)})`);
   }
   const before = deps.appModule.readVersion(manifestPath);
   const registered = deps.appModule.isRegistered();
+  // A decision for the person (stderr) and for the log file; a decision that needs no reader goes to the log file only.
+  const note = (line: string): void => deps.appendLog('info', `${line} [${UPDATER_CAPABILITIES}]`);
   return async () => {
     try {
       await registerAfterUpdate({
@@ -116,10 +130,16 @@ function prepareAppModule(deps: UpdaterDeps): () => Promise<void> {
         before,
         readVersion: deps.appModule.readVersion,
         register: deps.appModule.register,
-        log: (line) => deps.stdout(`[project-updater] ${line}`),
+        log: (line) => {
+          deps.stderr(`[project-updater] ${line}`);
+          note(line);
+        },
+        note,
       });
     } catch (error) {
-      deps.stderr(`[project-updater] app-core: registration after the update failed (${error instanceof Error ? error.message : String(error)}). Run: project cli register`);
+      const text = `app-core: registration after the update failed (${error instanceof Error ? error.message : String(error)}). Run: project cli register`;
+      deps.stderr(`[project-updater] ${text}`);
+      deps.appendLog('error', text);
     }
   };
 }

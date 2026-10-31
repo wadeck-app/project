@@ -1,0 +1,6 @@
+# Contribution to flow:execution-project-header (one execution). Host context: $sources.execution.projectId / .projectLabel,
+# both absent on executions that predate projects: nothing is shown then. Fixed address, see task-project-link.yaml.
+$type: ButtonLink
+$if: $sources.execution.projectId
+label: Projects
+to: /modules/project/

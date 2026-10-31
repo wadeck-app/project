@@ -72,7 +72,12 @@ describe('the bundle (ci/scripts/bundle.ts)', () => {
   it('builds project.cjs and project-updater.cjs stamped with the version', () => {
     const built = runBundleScript({ BUNDLE_VERSION: STAMP });
     // npm prints its own warnings on the runner (setup-node writes an npmrc with an unknown key): only real errors count.
-    expect(significantStderr(built.stderr)).toBe('');
+    // The packaging of the app-module prints one "optional module ... was not found" warning per provider that is not installed (task, queue,
+    // flow are never dependencies of this repository): expected, and not an error.
+    const unexpected = significantStderr(built.stderr)
+      .split('\n')
+      .filter((line) => !line.startsWith('warning: optional module '));
+    expect(unexpected.join('\n')).toBe('');
     expect(built.status).toBe(0);
     expect(existsSync(join(bundleDir, 'project.cjs'))).toBe(true);
     expect(existsSync(join(bundleDir, 'project-updater.cjs'))).toBe(true);
@@ -94,6 +99,10 @@ describe('the bundle (ci/scripts/bundle.ts)', () => {
     const updater = readFileSync(join(bundleDir, 'project-updater.cjs'), 'utf8');
     expect(updater).toContain('registerModule');
     expect(updater).not.toContain('paths remove');
+  });
+
+  it('carries the capability marker the install check greps for in the updater of the previous version', () => {
+    expect(readFileSync(join(bundleDir, 'project-updater.cjs'), 'utf8')).toContain('reregister-on-update:v1');
   });
 
   it('bundles the updater that journals an install and repairs an interrupted one (shared-updater 2026.10.25-019 or later)', () => {

@@ -1,0 +1,17 @@
+# Fixture of the page of one execution: the slot flow:execution-project-header is embedded as flow does.
+$sources:
+  execution:
+    url: GET /api/modules/flow/executions/{id}
+    params:
+      id: $route.id
+  header:
+    url: GET /api/slots/flow:execution-project-header
+
+$type: PageContent
+sections:
+  - $type: PageHeader
+    title: Fixture flow execution
+  - $type: HorizontalStack
+    items:
+      - $type: ExtensionSlot
+        items: $sources.header

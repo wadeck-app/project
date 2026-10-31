@@ -1,0 +1,26 @@
+{
+  "id": "task",
+  "expose": {
+    "slots": {
+      "project-header": {
+        "accepts": [
+          "ButtonLink",
+          "IconButton",
+          "Badge"
+        ]
+      }
+    }
+  },
+  "extensionPoints": [
+    {
+      "kind": "page",
+      "slot": "route",
+      "label": "Project tasks",
+      "path": "/tasks/p/:project",
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/project-tasks.yaml"
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+# Fixture of the executions list: the slot flow:executions-project-header is embedded as flow does. The host has only the URL parameter project.
+$sources:
+  header:
+    url: GET /api/slots/flow:executions-project-header
+
+$type: PageContent
+sections:
+  - $type: PageHeader
+    title: Fixture flow executions
+  - $type: HorizontalStack
+    items:
+      - $type: ExtensionSlot
+        items: $sources.header

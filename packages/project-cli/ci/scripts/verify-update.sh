@@ -43,6 +43,17 @@ first_run
 ACTUAL="$(installed_version)"
 assert_equals "installed version" "$PREVIOUS" "$ACTUAL"
 
+# The registration after an update is done by the updater of the version being REPLACED, not by the new one: the check below can only
+# hold for a previous version whose updater knows how (its bundle carries the capability marker, see UPDATER_CAPABILITIES).
+MARKER="reregister-on-update:v1"
+if grep -q "$MARKER" "$(installed_package_dir)/project-updater.cjs"; then
+  PREVIOUS_RE_REGISTERS=1
+  echo "the updater of $PREVIOUS carries '$MARKER': the update from it is checked to re-register the app-module"
+else
+  PREVIOUS_RE_REGISTERS=0
+  echo "the updater of $PREVIOUS has no '$MARKER': it cannot re-register the app-module after an update"
+fi
+
 # The registration after an update is done by the updater of the version being REPLACED. A previous version that ships no app-module
 # has an updater that cannot register one: the check below only applies when the previous version carries it (it is skipped, loudly, otherwise).
 PREVIOUS_SHIPS_APP_MODULE=0
@@ -79,10 +90,13 @@ rm -f "$APP_CORE_CONFIG_DIR/modules/project.json"
 step "(e4) project cli update installs $VERSION again, and registers the app-module again (it was registered)"
 update_to "$VERSION"
 assert_file "the staged copy of the app-module after the second update" "$XDG_CONFIG_HOME/project/app-module/$VERSION/manifest.json"
-if [ "$PREVIOUS_SHIPS_APP_MODULE" = "1" ]; then
+if [ "$PREVIOUS_SHIPS_APP_MODULE" = "1" ] && [ "$PREVIOUS_RE_REGISTERS" = "1" ]; then
   assert_file "the pending registration for app-core, written by the update" "$APP_CORE_CONFIG_DIR/modules/project.json"
-else
+  assert_contains "the log file of the updater" "re-registering the project pages" "$(cat "$XDG_CONFIG_HOME"/project/logs/*.ndjson)"
+elif [ "$PREVIOUS_SHIPS_APP_MODULE" != "1" ]; then
   echo "SKIPPED: the pending registration written by the update: $PREVIOUS ships no app-module, so its updater cannot register one (the check applies from the next release on)"
+else
+  echo "SKIPPED: the pending registration written by the update: the updater that ran is the one of $PREVIOUS, which has no '$MARKER' (it is the first release after that one that can be checked this way)"
 fi
 
 echo

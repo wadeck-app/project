@@ -71,3 +71,18 @@ describe('package-lock.json and the dev-build guard', () => {
     ).toBe(true);
   });
 });
+
+describe('package-lock.json and the optional contributions of app-core', () => {
+  const MINIMUM = '2026.10.31-141-a31f1e63';
+
+  // The project module lists task, queue and flow in `optionalRequires` (never `requires`): an older app-core-cli does not know the key (check and package refuse the manifest),
+  // an older app-core-sdk does not type it, and the server of 2026.10.31-140 has the feature but not the tooling (check/package of -140 are not usable).
+  it.each(['@wadeck-app/app-core-cli', '@wadeck-app/app-core-sdk'])('pins %s with `optionalRequires` (2026.10.31-141 or later)', (name) => {
+    const locked = lockedVersion(name);
+    expect(
+      isAtLeast(locked, MINIMUM),
+      `package-lock.json pins ${name} ${locked}: manifest.json of the project module uses "optionalRequires", which needs ${MINIMUM} or later (the earlier 2026.10.31-140 has the server only). ` +
+        `Refresh it with: npm update @wadeck-app/app-core-cli @wadeck-app/app-core-sdk, and commit package-lock.json`,
+    ).toBe(true);
+  });
+});

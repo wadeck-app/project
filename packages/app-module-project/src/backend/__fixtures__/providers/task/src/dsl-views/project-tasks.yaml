@@ -1,0 +1,13 @@
+# Fixture of the task page of one project: the slot task:project-header is embedded as task does (host context: $route.project).
+$sources:
+  header:
+    url: GET /api/slots/task:project-header
+
+$type: PageContent
+sections:
+  - $type: PageHeader
+    title: Fixture task page
+  - $type: HorizontalStack
+    items:
+      - $type: ExtensionSlot
+        items: $sources.header

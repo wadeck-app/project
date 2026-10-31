@@ -1,0 +1,18 @@
+# Fixture of the events page of the queue: ?id=<project id>&name=<project name>.
+$sources:
+  projectScope:
+    url: GET /api/modules/queue/project-scope
+    params:
+      id: $urlParam.id
+      name: $urlParam.name
+  header:
+    url: GET /api/slots/queue:project-header
+
+$type: PageContent
+sections:
+  - $type: PageHeader
+    title: Fixture queue events
+  - $type: HorizontalStack
+    items:
+      - $type: ExtensionSlot
+        items: $sources.header

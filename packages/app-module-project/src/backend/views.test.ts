@@ -71,7 +71,7 @@ describe('manifest.json', () => {
   });
 
   it('declares the pages: Projects (/), Tree, Trash in the menu and /p/:project for the detail', () => {
-    expect(manifest.extensionPoints.map((p) => `${p.kind}:${p.slot}:${p.path}:${p.label}`)).toEqual([
+    expect(manifest.extensionPoints.filter((p) => p.kind === 'page').map((p) => `${p.kind}:${p.slot}:${p.path}:${p.label}`)).toEqual([
       'page:nav:/:Projects',
       'page:nav:/tree:Tree',
       'page:nav:/deleted:Trash',

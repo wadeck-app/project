@@ -11,6 +11,7 @@ function makeDeps(versions: AppModuleVersion[], overrides: Partial<UpdaterDeps> 
   const err: string[] = [];
   const register = vi.fn(async (_manifestPath: string, log: (entry: { source: string; message: string }) => void) => log({ source: 'x', message: 'app-core: module "project" registered' }));
   const isRegistered = vi.fn(() => true);
+  const notes: string[] = [];
   const readVersion = vi.fn(() => versions.shift() ?? ({ absent: true } as AppModuleVersion));
   const deps: UpdaterDeps = {
     env: {},
@@ -27,19 +28,29 @@ function makeDeps(versions: AppModuleVersion[], overrides: Partial<UpdaterDeps> 
     now: () => 5000,
     stdout: (line) => out.push(line),
     stderr: (line) => err.push(line),
+    appendLog: (_level, text) => notes.push(text),
     appModule: { readVersion, register, isRegistered },
     ...overrides,
   };
-  return { deps, out, err, register, readVersion, isRegistered };
+  return { deps, out, err, register, readVersion, isRegistered, notes };
 }
 
 describe('runProjectUpdater: the app-module after an update', () => {
+  // `npm root -g` answers with a line break; the path of the manifest must not carry it (it did: the manifest was never found, nothing was
+  // registered and nothing was said, in every real run).
+  it.each([['LF', '\n'], ['CRLF', '\r\n']])('finds the manifest when npm root -g ends with %s', async (_name, ending) => {
+    const { deps, register } = makeDeps([{ version: '1' }, { version: '2' }], { npmRootGlobal: () => `/npm/root${ending}` });
+    await runProjectUpdater(deps);
+    expect(register).toHaveBeenCalledTimes(1);
+    expect(register.mock.calls[0]![0]).toBe(MANIFEST);
+  });
+
   it('registers nothing when the module was never registered (the first registration is explicit) and says how to', async () => {
-    const { deps, register, out } = makeDeps([{ absent: true }, { version: '2' }]);
+    const { deps, register, err } = makeDeps([{ absent: true }, { version: '2' }]);
     deps.appModule.isRegistered = () => false;
     expect(await runProjectUpdater(deps)).toBe(0);
     expect(register).not.toHaveBeenCalled();
-    expect(out.join('\n')).toContain('project cli register');
+    expect(err.join('\n')).toContain('project cli register');
   });
 
   it('reads whether the module was registered BEFORE the install (an install must not create the signal)', async () => {
@@ -54,11 +65,11 @@ describe('runProjectUpdater: the app-module after an update', () => {
   });
 
   it('tells app-core about the new pages when the installed app-module changed, and prints what app-core answered', async () => {
-    const { deps, out, register } = makeDeps([{ version: '1' }, { version: '2' }]);
+    const { deps, err, register } = makeDeps([{ version: '1' }, { version: '2' }]);
     expect(await runProjectUpdater(deps)).toBe(0);
     expect(register).toHaveBeenCalledTimes(1);
     expect(register.mock.calls[0]![0]).toBe(MANIFEST);
-    expect(out).toContain('[project-updater] app-core: module "project" registered');
+    expect(err).toContain('[project-updater] app-core: module "project" registered');
   });
 
   it('reads the version BEFORE the install replaces the files', async () => {
@@ -73,6 +84,25 @@ describe('runProjectUpdater: the app-module after an update', () => {
     };
     await runProjectUpdater(deps);
     expect(order).toEqual(['read', 'install', 'read']);
+  });
+
+  it('writes the decision to the log file too: re-registering, not registered, unchanged', async () => {
+    const changed = makeDeps([{ version: '1' }, { version: '2' }]);
+    await runProjectUpdater(changed.deps);
+    expect(changed.notes.join('\n')).toContain('re-registering');
+    const never = makeDeps([{ version: '1' }, { version: '2' }]);
+    never.deps.appModule.isRegistered = () => false;
+    await runProjectUpdater(never.deps);
+    expect(never.notes.join('\n')).toContain('not registered');
+    const same = makeDeps([{ version: '1' }, { version: '1' }]);
+    await runProjectUpdater(same.deps);
+    expect(same.notes.join('\n')).toContain('unchanged (1)');
+  });
+
+  it('says in the log file which behaviour this updater has (a CI check greps the bundle for it): reregister-on-update:v1', async () => {
+    const { deps, notes } = makeDeps([{ version: '1' }, { version: '2' }]);
+    await runProjectUpdater(deps);
+    expect(notes.join('\n')).toContain('reregister-on-update:v1');
   });
 
   it('does nothing when the app-module did not change (already up to date, failed or rolled back update)', async () => {

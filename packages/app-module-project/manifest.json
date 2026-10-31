@@ -1,12 +1,26 @@
 {
   "id": "project",
+  "optionalRequires": {
+    "task": "*",
+    "queue": "*",
+    "flow": "*"
+  },
   "expose": {
     "slots": {
       "project-panels": {
-        "accepts": ["Section", "Collapsible", "Badge", "ButtonLink"]
+        "accepts": [
+          "Section",
+          "Collapsible",
+          "Badge",
+          "ButtonLink"
+        ]
       },
       "project-links": {
-        "accepts": ["ButtonLink", "IconButton", "Badge"]
+        "accepts": [
+          "ButtonLink",
+          "IconButton",
+          "Badge"
+        ]
       }
     }
   },
@@ -16,28 +30,67 @@
       "slot": "nav",
       "label": "Projects",
       "path": "/",
-      "view": { "type": "path", "value": "./src/dsl-views/projects-page.yaml" }
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/projects-page.yaml"
+      }
     },
     {
       "kind": "page",
       "slot": "nav",
       "label": "Tree",
       "path": "/tree",
-      "view": { "type": "path", "value": "./src/dsl-views/tree-page.yaml" }
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/tree-page.yaml"
+      }
     },
     {
       "kind": "page",
       "slot": "nav",
       "label": "Trash",
       "path": "/deleted",
-      "view": { "type": "path", "value": "./src/dsl-views/deleted-page.yaml" }
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/deleted-page.yaml"
+      }
     },
     {
       "kind": "page",
       "slot": "route",
       "label": "Project",
       "path": "/p/:project",
-      "view": { "type": "path", "value": "./src/dsl-views/project-page.yaml" }
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/project-page.yaml"
+      }
+    },
+    {
+      "kind": "widget",
+      "slot": "task:project-header",
+      "label": "Project link (task)",
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/task-project-link.yaml"
+      }
+    },
+    {
+      "kind": "widget",
+      "slot": "queue:project-header",
+      "label": "Project link (queue)",
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/queue-project-link.yaml"
+      }
+    },
+    {
+      "kind": "widget",
+      "slot": "flow:execution-project-header",
+      "label": "Project link (flow execution)",
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/flow-execution-project-link.yaml"
+      }
     }
   ]
 }
