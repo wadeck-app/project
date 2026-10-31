@@ -52,8 +52,8 @@ Introduce a "project" concept: a base folder (usually a git repo, not required) 
 | 2 | What identifies a project (absolute path, generated id, name)? | High | Resolved (Decision #2) |
 | 3 | What marks a project root and how is it resolved (walk-up, marker file)? | High | Resolved (Decision #3) |
 | 4 | Nested scopes: do they exist, and how does config inherit? | High | Resolved (Decision #6); merge rule in #13 |
-| 5 | Cross-project targeting syntax (flag, env, ref in ids) | Medium | Partially resolved (flag and reference forms: Decision #11); env var and cross-project ids in #20 |
-| 6 | Do daemon-global stores (queue WAL, flow history) get a project key/filter? | Medium | Partially resolved (records keyed by project id: Decision #9); user-facing filters (`queue history --project`) open |
+| 5 | Cross-project targeting syntax (flag, env, ref in ids) | Medium | Resolved (flag and reference forms: Decision #11; env var per CLI: #21; cross-project ids `<project>/<id>`: #30) |
+| 6 | Do daemon-global stores (queue WAL, flow history) get a project key/filter? | Medium | Resolved (records keyed by project id: Decision #9; `queue history|status|dlq list --project` shipped in queue-cli, verified 2026-10-31) |
 | 7 | Migration of existing `projects.json`, per-CLI markers and in-folder data/config (`.task`, `.flow`, `.queue`): who migrates, legacy config fallback or ignored, duplicate basenames (two `alpha`), stray config keys now rejected (#8) | High | Resolved (Decision #17: manual move, no migration code); who moves what is negotiated with the owners |
 | 8 | Permission model for acting on another project (hooks, subscribers) | High | Resolved (Decision #10) |
 | 9 | Does a standalone `project` CLI binary exist, or are commands hosted in existing CLIs? | Medium | Resolved (Decision #1: thin `project-cli`) |
@@ -69,8 +69,8 @@ Introduce a "project" concept: a base folder (usually a git repo, not required) 
 | 23 | SDK public API shape: registry lookup, data-dir function (signature, does it create the dir), config read with inheritance, origin | High | Resolved (Decision #27; origin excluded, see Q26) |
 | 24 | Fate of `task init` and `task projects *` (remove, deprecate, wrappers over `project add`) | Medium | Resolved (Decision #20) |
 | 25 | `project remove`: does it delete the project's config/data folder (task guarantees today that remove never deletes data) | High | Resolved (Decision #19: soft delete) |
-| 32 | Soft delete details: reuse of a deleted project's name/aliases, restore command (removing a project with children: Decision #24) | Medium | Partially resolved; name reuse and restore open |
-| 26 | Origin recording format: fields, where (task history, event payloads, hook env), virtual project or no project | Medium | Open |
+| 32 | Soft delete details: reuse of a deleted project's name/aliases, restore command (removing a project with children: Decision #24) | Medium | Resolved (Decisions #19, #24, #30: soft delete, `--recursive` for parents, names freed, `project restore`) |
+| 26 | Origin recording format: fields, where (task history, event payloads, hook env), virtual project or no project | Medium | Resolved (Decision #30: `Origin { tool, at, projectId?, projectName?, cwd? }`, SDK `buildOrigin`/`formatOrigin`; adoption by the CLIs optional) |
 | 27 | Which identifier appears in app URLs/API (id length, name/alias change on rename); how the app-core module finds the registry | Medium | Resolved (user-confirmed 2026-10-26, Decision #29): project id (8 hex) in URLs/API, name for display; app-core module uses `defaultRegistryDir(process.env)` + `resolveReference` + `mainPath` (no cwd) |
 | 28 | Several paths: cwd for events and `ctx.project.path` from a non-main worktree; virtual projects (no cwd) and events | High | Resolved (Decision #25; virtual projects: Decision #5). Proposal sent to owners, not user-confirmed: virtual projects are config-only, a command that needs a path or emits an event fails with `VirtualProjectError` |
 | 29 | Inheritance chain: where a write (`task type add`) goes, and cross-level validation (e.g. at most one default status) | Medium | Resolved (user-confirmed 2026-10-26, Decision #29): a write goes to the project's own layer; cross-level validation stays in the tool after the merge |
@@ -78,7 +78,7 @@ Introduce a "project" concept: a base folder (usually a git repo, not required) 
 | 22 | Name of each project's folder in the config dir (id, name slug, or both); must stay valid when a name/alias is renamed | High | Resolved (Decision #15) |
 | 18 | `project-sdk` versioning and pinning (queue-sdk model vs singleton-daemon-kit model) | Medium | Resolved (Decision #18: CalVer + "latest", like app-core-sdk) |
 | 21 | Daemons (flow, queue) are shared by all clients: what happens when a client uses a different registry location than the one the daemon started with (test vs production) | High | Deferred (Decision #16); owner findings in file 10 (queue-owner replied; flow-owner request withdrawn) |
-| 20 | Env var to set a default project (e.g. for agents/workers) and syntax for referring to another project's task/run/event ids | Medium | Partially resolved (env var per CLI: Decision #21); syntax for another project's ids open |
+| 20 | Env var to set a default project (e.g. for agents/workers) and syntax for referring to another project's task/run/event ids | Medium | Resolved (env var per CLI: Decision #21; qualified id syntax `<project>/<id>`: Decision #30) |
 | 19 | How is a section's scope and merge strategy declared and enforced in the configuration (key prefixes such as global./local., schema metadata, key operators) | High | Resolved (Decision #8) |
 
 ## Modules / Sub-files

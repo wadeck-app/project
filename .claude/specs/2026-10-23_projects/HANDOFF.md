@@ -1,20 +1,29 @@
 # Handoff -- Projects spec
 
-Updated 2026-10-24 by `project-owner`. Supersedes the brainstorming handoff (history in git/`_index.md` changelog).
+Updated 2026-10-31 by `project-owner`. Supersedes the earlier handoffs (history in git and the `_index.md` changelog).
 
 ## State
 
-- Spec v0.23: 27 decisions (`_index.md` Decision Log). Open: Q5/Q20 (syntax for another project's ids), Q6 (user-facing filters), Q26 origin format, Q27 ids in URLs and app-core registry discovery, Q29 write target in a chain, Q30 lock coverage of tool data, Q31 queue subscriber lookup, Q32 name reuse and restore. Deferred: registry override and daemon mismatch (Q21, Decision #16).
-- Code: `packages/project-sdk` (zero-dependency, tested) and `packages/project-cli` (CLI with the task/queue distribution stack: Go launcher, 3 platform packages, auto-update via shared-updater, labels, native path messages, invocation logs). Pushed to `origin/main`; CI green on ubuntu/windows/macos; both packages published on every push to main (tag `latest`, CalVer, e.g. `2026.10.25-009-c42722ea`).
-- Auto-update verified end to end in an isolated npm prefix and registry dir with real published versions (004 -> 009): background update after the 30 min throttle (cache reset), self-check on the new version, "Updated to ... To go back: project cli rollback" notice, `cli rollback` after several commands, forced `cli update`, `cli logs`. The platform package is installed by the launcher fallback on first run (same as task-cli). Not run: macOS/Linux installs, a real kill of the updater inside `npm install -g`.
-- Updater incident (scrapers-owner, 2026-10-25): an updater killed inside `npm install -g` removed the global CLI. Fixed in `@wadeck-app/shared-updater` 019/020; our lockfile had pinned 2026.10.10-017 (all project-cli versions up to 008 bundle the old updater). Now locked at 2026.10.25-020, guarded by `lockfile.test.ts`; `cli update`/`cli rollback` refuse to run from a development build; the notice handles the `applying` status. Keep `package-lock.json` current when shared-updater changes.
+- Spec: 30 decisions (`_index.md` Decision Log); every question is resolved except Q21 (registry override and daemon-vs-registry mismatch), deferred by Decision #16.
+- Code: `packages/project-sdk` (zero-dependency) and `packages/project-cli` (Go launcher, 3 platform packages, auto-update via shared-updater, labels with wildcard selectors, restore, native path messages, invocation logs). Published from CI on every push to `main` (tag `latest`, CalVer, latest verified `2026.10.27-014-cac65567`); CI runs build+test on ubuntu/windows/macos and a post-publish `verify-install` job (install, self-check, smoke scenario, real update and rollback) on the three OS.
+- Adoption (verified in the repos 2026-10-31): task, queue and flow depend on `project-sdk`; none keeps its own project resolution; `-p/--project` and `<TOOL>_PROJECT` go through `extractProjectOption` (task, queue) or a parser with a conformance test against it (flow, commander). Queue routes events to the project and its ancestors, `to-children` opt-in, virtual projects can emit. orchestrator and app-core have no project concept (checked in the code).
+- Migration of the existing data (Decision #17, by hand) is done for `test-flow` and `test-tasks`: queue subscribers and task data now live in the registry (`~/.config/project/projects/<id>/`).
+- Auto-update verified end to end with real published versions in an isolated npm prefix: background update, self-check, notice, `cli rollback`, forced update, logs. Linux: not a goal (ci-templates: "three platforms only, no Linux"); the CI Linux leg runs `project.cjs` with node.
+- Updater incident (scrapers-owner, 2026-10-25): fixed in `@wadeck-app/shared-updater` 019/020 and the shared `ReleaseVersion` guard in shared-cli 044; keep `package-lock.json` current (`lockfile.test.ts` enforces minimums).
+
+## Not verified
+
+- A real kill of the updater inside `npm install -g` and the repair after it (only fake states are tested).
+- A parent/child hierarchy on the real registry (covered by tests; the real registry has none).
+- The `project` command on Linux.
 
 ## Do next
 
-1. `project-cli` launcher, platform packages and auto-update following `11_findings_repo-layout.md` (avoid the listed pitfalls), extend `publish.yml` to publish it.
-2. Support task-owner, flow-owner, queue-owner adopting `project-sdk`; settle Q26, Q27, Q29, Q30, Q31 with them, proposing defaults.
-3. Manual migration of existing data when the CLIs are ready (Decision #17).
+1. Re-verify a repo when its owner reports a change (task: note on stderr for an ignored `-p` shipped; flow: ships the conformance test with its next push).
+2. Optional adoption by the CLIs of qualified ids (`<project>/<id>`), `Origin` and `project restore`: owners decide, no deadline.
+3. Keep `package-lock.json` (shared-cli, shared-updater) current when those packages change.
+4. Q21 only if the user wants the registry override back.
 
 ## User principles
 
-Fail loudly (P-1), all machines trusted (P-2), report bugs to the owning session (P-3); get a working feature first, iterate later; no detail questions that do not block.
+Fail loudly (P-1), all machines trusted (P-2), report bugs to the owning session (P-3); get a working feature first, iterate later; no detail questions that do not block; autonomy on commit, push, CI and updates.
