@@ -7,11 +7,12 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=packages/project-sdk && npm run build --workspace=packages/project-cli",
-    "test": "npm run test --workspace=packages/project-sdk && npm run test --workspace=packages/project-cli",
+    "build": "npm run build --workspace=packages/project-sdk && npm run build --workspace=packages/project-cli && npm run build --workspace=packages/app-module-project",
+    "test": "npm run test --workspace=packages/project-sdk && npm run test --workspace=packages/project-cli && npm run test --workspace=packages/app-module-project",
     "bundle": "npm run bundle --workspace=packages/project-cli",
     "build-launcher": "npm run build-launcher --workspace=packages/project-cli",
-    "clean": "npm run clean --workspace=packages/project-sdk && npm run clean --workspace=packages/project-cli",
+    "clean": "npm run clean --workspace=packages/project-sdk && npm run clean --workspace=packages/project-cli && npm run clean --workspace=packages/app-module-project",
+    "check": "npm run check --workspace=packages/app-module-project",
     "preversion": "npm test"
   },
   "devDependencies": {
