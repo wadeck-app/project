@@ -26,14 +26,8 @@ const PROVIDERS = {
   'task:project-header': { provider: 'task', accepts: ['ButtonLink', 'IconButton', 'Badge'] },
   'queue:project-header': { provider: 'queue', accepts: ['Badge', 'Link', 'ButtonLink'] },
   'flow:execution-project-header': { provider: 'flow', accepts: ['ButtonLink', 'IconButton', 'Badge', 'Link'] },
+  'flow:executions-project-header': { provider: 'flow', accepts: ['ButtonLink', 'IconButton', 'Badge', 'Link'] },
 } as const;
-
-/**
- * Not contributed to, on purpose: flow:executions-project-header. Its host has only the URL parameter `project`, and a contributed node
- * cannot read it (`$urlParam` is not in its context: checked in a browser, the link never rendered). A contribution there could only be
- * shown unconditionally, on every executions page. It needs the host to put the value in one of its sources.
- */
-const NOT_CONTRIBUTED = ['flow:executions-project-header'];
 
 const widgets = manifest.extensionPoints.filter((point) => point.kind === 'widget');
 
@@ -71,43 +65,43 @@ describe('the widgets it contributes', () => {
     expect(widgets.map((point) => point.slot).sort()).toEqual(Object.keys(PROVIDERS).sort());
   });
 
-  it('do not contribute to the slot whose host context a contributed node cannot read', () => {
-    for (const slot of NOT_CONTRIBUTED) {
-      expect(widgets.map((p) => p.slot), slot).not.toContain(slot);
-    }
+  // A prop is an expression only when it STARTS with $: "/modules/project/p/$route.project" is followed as typed (seen in a browser), the address is
+  // therefore built with $concat(...) (dsl-renderer 2026.10.31-306 and later).
+  const link = (id: string): string => `$concat('/modules/project/p/', ${id})`;
+  const ID_OF: Record<keyof typeof PROVIDERS, string> = {
+    'task:project-header': '$route.project',
+    'queue:project-header': '$sources.projectScope.id',
+    'flow:execution-project-header': '$sources.execution.projectId',
+    'flow:executions-project-header': '$urlParam.project',
+  };
+
+  it.each(Object.entries(PROVIDERS))('%s: the root $type is one the slot accepts', (slot, contract) => {
+    const view = viewOf(widgets.find((p) => p.slot === slot)!);
+    expect(contract.accepts, `${slot} accepts ${contract.accepts.join(', ')}`).toContain(view['$type']);
   });
 
-  // A prop that is not ONE expression ("$a.b") is a literal: "/modules/project/p/$route.project" would be followed as it is (checked in a
-  // browser: href="/modules/project/p/$route.project"). The link is therefore a fixed address until a host gives a ready-made one.
-  it.each(Object.entries(PROVIDERS))('%s: the root $type is one the slot accepts, and it is a link to the project registry with a fixed address', (slot, contract) => {
-    const point = widgets.find((p) => p.slot === slot)!;
-    const view = viewOf(point);
-    expect(contract.accepts, `${slot} accepts ${contract.accepts.join(', ')}`).toContain(view['$type']);
-    expect(view['to'], slot).toBe('/modules/project/');
+  it.each(Object.entries(ID_OF))('%s: links to the page of the project, built with $concat from what the host gives', (slot, id) => {
+    expect(viewOf(widgets.find((p) => p.slot === slot)!)['to'], slot).toBe(link(id));
   });
 
   it.each(Object.keys(PROVIDERS))('%s: declares no $sources of its own (a contributed node cannot, app-core ignores them)', (slot) => {
-    const view = viewOf(widgets.find((p) => p.slot === slot)!);
-    expect(view).not.toHaveProperty('$sources');
+    expect(viewOf(widgets.find((p) => p.slot === slot)!)).not.toHaveProperty('$sources');
   });
 
-  it('read only what the host gives (final contracts)', () => {
-    const text = (slot: string): string => readFileSync(join(packageDir, widgets.find((p) => p.slot === slot)!.view.value), 'utf8');
-    expect(text('task:project-header')).toContain('$route.project');
-    expect(text('queue:project-header')).toContain('$sources.projectScope.found');
-    expect(text('flow:execution-project-header')).toContain('$sources.execution.projectId');
-  });
-
-  it('show nothing when the host has no project (queue: not found; flow: old executions without a project)', () => {
+  it('is shown only when the host has a project (task: a project page; queue: found; flow: an execution with a project, a list with ?project=)', () => {
     const guard = (slot: string): unknown => viewOf(widgets.find((p) => p.slot === slot)!)['$if'];
     expect(guard('task:project-header')).toBe('$route.project');
     expect(guard('queue:project-header')).toBe('$sources.projectScope.found');
     expect(guard('flow:execution-project-header')).toBe('$sources.execution.projectId');
+    expect(guard('flow:executions-project-header')).toBe('$urlParam.project');
   });
 
-  it('are labelled "Projects": the address is the registry, not the project, so the name of the project would mislead', () => {
-    for (const slot of Object.keys(PROVIDERS)) {
-      expect(viewOf(widgets.find((p) => p.slot === slot)!)['label'], slot).toBe('Projects');
-    }
+  it('is labelled with the name of the project when the host gives it, else "Project"', () => {
+    const label = (slot: string): unknown => viewOf(widgets.find((p) => p.slot === slot)!)['label'];
+    expect(label('task:project-header')).toBe('Project');
+    expect(label('queue:project-header')).toBe('$sources.projectScope.name');
+    // Old executions have no projectLabel: the guard on projectId decides whether to show, the label falls back.
+    expect(label('flow:execution-project-header')).toBe("$sources.execution.projectLabel || 'Project'");
+    expect(label('flow:executions-project-header')).toBe('Project');
   });
 });

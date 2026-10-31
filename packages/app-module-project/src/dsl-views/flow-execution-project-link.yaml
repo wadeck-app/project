@@ -1,6 +1,6 @@
 # Contribution to flow:execution-project-header (one execution). Host context: $sources.execution.projectId / .projectLabel,
-# both absent on executions that predate projects: nothing is shown then. Fixed address, see task-project-link.yaml.
+# both absent on executions that predate projects: nothing is shown then (and "Project" is the label when only the name is missing).
 $type: ButtonLink
 $if: $sources.execution.projectId
-label: Projects
-to: /modules/project/
+label: "$sources.execution.projectLabel || 'Project'"
+to: "$concat('/modules/project/p/', $sources.execution.projectId)"

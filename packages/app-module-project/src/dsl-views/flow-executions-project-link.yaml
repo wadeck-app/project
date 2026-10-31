@@ -1,0 +1,6 @@
+# Contribution to flow:executions-project-header (the executions list of one project). Host context: only the URL parameter `project`
+# (a project reference: the project page accepts an id, a name or an alias). Shown only when the parameter is there.
+$type: ButtonLink
+$if: $urlParam.project
+label: Project
+to: "$concat('/modules/project/p/', $urlParam.project)"

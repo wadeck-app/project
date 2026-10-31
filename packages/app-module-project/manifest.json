@@ -91,6 +91,15 @@
         "type": "path",
         "value": "./src/dsl-views/flow-execution-project-link.yaml"
       }
+    },
+    {
+      "kind": "widget",
+      "slot": "flow:executions-project-header",
+      "label": "Project link (flow executions)",
+      "view": {
+        "type": "path",
+        "value": "./src/dsl-views/flow-executions-project-link.yaml"
+      }
     }
   ]
 }

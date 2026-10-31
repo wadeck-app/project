@@ -71,20 +71,20 @@ Host context: a contribution is rendered with the data of the detail page. Avail
 
 `manifest.json` has `"optionalRequires": { "task": "*", "queue": "*", "flow": "*" }` and **never `requires`**: this module works without any of them. A contribution to a module that is not loaded is **inactive** (`GET /api/modules` gives the module a `warnings` list and the extension point an `inactive` reason; app-core logs it once); it activates when the provider loads, even later, and deactivates when it goes away. Nobody is unloaded either way.
 
-| Slot | Accepts | Host context used | Shown when |
-|---|---|---|---|
-| `task:project-header` | `ButtonLink`, `IconButton`, `Badge` | `$route.project` | the page is the page of a project |
-| `queue:project-header` | `Badge`, `Link`, `ButtonLink` | `$sources.projectScope` = `{ id, name, found }` | `found` is true |
-| `flow:execution-project-header` | `ButtonLink`, `IconButton`, `Badge`, `Link` | `$sources.execution.projectId` | the execution has a project (old ones do not) |
-| `flow:executions-project-header` | same | only the URL parameter `project` | **no contribution**, see below |
+Each contribution is a `ButtonLink` to the page of the project, with no `$sources` of its own (a contributed node cannot declare any):
 
-What a contributed node can and cannot do (checked in a browser against fixtures of the hosts, `src/backend/__fixtures__/providers`):
+| Slot | Accepts | Host context used | Shown when | Label |
+|---|---|---|---|---|
+| `task:project-header` | `ButtonLink`, `IconButton`, `Badge` | `$route.project` (8-hex id) | on a project page of task | "Project" |
+| `queue:project-header` | `Badge`, `Link`, `ButtonLink` | `$sources.projectScope` = `{ id, name, found }` | `found` is true | `$sources.projectScope.name` |
+| `flow:execution-project-header` | `ButtonLink`, `IconButton`, `Badge`, `Link` | `$sources.execution.projectId` / `.projectLabel` | the execution has a `projectId` (old ones do not: no link) | `projectLabel`, else "Project" |
+| `flow:executions-project-header` | same | the URL parameter `project` (`$urlParam.project`) | the parameter is present | "Project" |
 
-- `$if` on a host path works, and so does a label read from a host source (`label: $sources.execution.projectLabel`).
-- A prop is an expression only when the WHOLE value is one path (`to: $sources.x.href`). A path inside a string is **not** interpolated: `to: /modules/project/p/$route.project` is followed as it is. A contribution therefore cannot build `/modules/project/p/<id>`: the three links go to the project registry (`/modules/project/`, label "Projects"). To open the page of the project, a host must give a ready-made address in one of its sources (a whole value).
-- `$urlParam.*` is not in the context of a contributed node (the link never rendered): `flow:executions-project-header` has nothing to read, so nothing is contributed there until the host copies the value into a source.
+The address is built in the view: `to: "$concat('/modules/project/p/', $route.project)"`. A prop is an expression only when it starts with `$`: `/modules/project/p/$route.project` is followed as typed. The project page accepts an id, a name or an alias, so `?project=shop` works as well as `?project=<id>`. `$concat(...)` and `$urlParam.<name>` in a node prop (also in a contributed node) need dsl-renderer / dsl-ui 2026.10.31-306 or later; `$urlParam` and `$concat` are **not** available in the `params` or `url` of `$sources`.
 
-**Independence is guarded**: `src/backend/contributions.test.ts` fails if `manifest.json` gets a `requires`, if `optionalRequires` is not exactly task/queue/flow, if a widget targets a module that is not in `optionalRequires`, or if `package.json` lists a provider. `src/backend/optional.integration.test.ts` loads the module in a real app-core without any provider (it loads, warns, works), then loads fixtures of the providers one by one (each activates its contributions) and removes one (it deactivates, nothing is unloaded). `app-core-cli check` / `package` print one warning per provider they cannot find and exit 0; they only find a provider listed in `package.json` (`--link` is keyed by the package name), so the test validates the root `$type`s against the slots on a copy of the module that lists them, including the real built modules of task, queue and flow when their repositories are next to this one.
+**Minimal versions** (pinned by `packages/project-cli/src/lockfile.test.ts`): `@wadeck-app/app-core-cli` and `@wadeck-app/app-core-sdk` 2026.10.31-145-cc2b3d27 (`optionalRequires`, `--link <moduleId>=<folder>` for optional providers, a shell with `$concat`), `@wadeck-app/dsl-ui` and `@wadeck-app/dsl-renderer` 2026.10.31-306-a2da8f4a.
+
+**Independence is guarded**: `src/backend/contributions.test.ts` fails if `manifest.json` gets a `requires`, if `optionalRequires` is not exactly task/queue/flow, if a widget targets a module that is not in `optionalRequires`, if `package.json` lists a provider, or if a link is not built from the host context shown above. `src/backend/optional.integration.test.ts` loads the module in a real app-core without any provider (it loads, warns, works), then loads fixtures of the providers one by one (each activates its contributions; `src/backend/__fixtures__/providers` replicate the slots and the host context of the real pages) and removes one (it deactivates, nothing is unloaded). `app-core-cli check` / `package` print one warning per provider they cannot find and exit 0; `--link task=<folder>` (the folder holds the provider's `dist-module`) validates the root `$type`s against the real slots, which the test does for the fixtures and for the real built modules of task, queue and flow when their repositories are next to this one.
 
 ## Related
 

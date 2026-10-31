@@ -73,16 +73,31 @@ describe('package-lock.json and the dev-build guard', () => {
 });
 
 describe('package-lock.json and the optional contributions of app-core', () => {
-  const MINIMUM = '2026.10.31-141-a31f1e63';
+  const MINIMUM = '2026.10.31-145-cc2b3d27';
 
   // The project module lists task, queue and flow in `optionalRequires` (never `requires`): an older app-core-cli does not know the key (check and package refuse the manifest),
   // an older app-core-sdk does not type it, and the server of 2026.10.31-140 has the feature but not the tooling (check/package of -140 are not usable).
-  it.each(['@wadeck-app/app-core-cli', '@wadeck-app/app-core-sdk'])('pins %s with `optionalRequires` (2026.10.31-141 or later)', (name) => {
+  it.each(['@wadeck-app/app-core-cli', '@wadeck-app/app-core-sdk'])('pins %s with `optionalRequires`, `--link <moduleId>` and the $concat shell (2026.10.31-145 or later)', (name) => {
     const locked = lockedVersion(name);
     expect(
       isAtLeast(locked, MINIMUM),
-      `package-lock.json pins ${name} ${locked}: manifest.json of the project module uses "optionalRequires", which needs ${MINIMUM} or later (the earlier 2026.10.31-140 has the server only). ` +
+      `package-lock.json pins ${name} ${locked}: manifest.json of the project module uses "optionalRequires", which needs ${MINIMUM} or later (-140 has the server only; -142 to -144 do not exist; -145 bundles the shell with $concat and $urlParam in node props, and --link <moduleId>=<folder> for optional providers). ` +
         `Refresh it with: npm update @wadeck-app/app-core-cli @wadeck-app/app-core-sdk, and commit package-lock.json`,
+    ).toBe(true);
+  });
+});
+
+describe('package-lock.json and the expressions of the contributed links', () => {
+  const MINIMUM = '2026.10.31-306-a2da8f4a';
+
+  // The widgets contributed to task, queue and flow build their address with to: "$concat('/modules/project/p/', $route.project)" and read $urlParam.project:
+  // an older dsl-renderer follows the text as it is (href="/modules/project/p/$route.project"), seen in a browser, and has no $urlParam in a node prop.
+  it.each(['@wadeck-app/dsl-renderer', '@wadeck-app/dsl-ui'])('pins %s with $concat and $urlParam in node props (2026.10.31-306 or later)', (name) => {
+    const locked = lockedVersion(name);
+    expect(
+      isAtLeast(locked, MINIMUM),
+      `package-lock.json pins ${name} ${locked}: the link widgets of the project module use $concat(...) and $urlParam.<name> in a node prop, which need ${MINIMUM} or later. ` +
+        'Refresh it with: npm update @wadeck-app/app-core-cli @wadeck-app/app-core-sdk @wadeck-app/dsl-ui @wadeck-app/dsl-renderer, and commit package-lock.json',
     ).toBe(true);
   });
 });

@@ -1,9 +1,8 @@
 # Contribution to task:project-header (task pages of one project: /tasks/p/:project, a task, /tree/p/:project).
-# Host context: $route.project = the 8-hex id of the project. Shown only when the host has a project.
-# The address is fixed: a prop is an expression only when it is ONE path ("$route.project"); "/modules/project/p/$route.project" would be
-# followed as it is (href="/modules/project/p/$route.project", seen in a browser). Until a host gives a ready-made address, the link opens
-# the registry. A contributed node has no $sources of its own.
+# Host context: $route.project = the 8-hex id of the project. Shown only when the host has a project; the host gives no name: "Project".
+# The address is built with $concat (dsl-renderer 2026.10.31-306 or later): a prop is an expression only when it starts with $, a path inside a
+# string ("/modules/project/p/$route.project") would be followed as typed. A contributed node has no $sources of its own.
 $type: ButtonLink
 $if: $route.project
-label: Projects
-to: /modules/project/
+label: Project
+to: "$concat('/modules/project/p/', $route.project)"

@@ -1,6 +1,5 @@
 # Contribution to queue:project-header. Host context: $sources.projectScope = { id, name, found }; shown only when the project was found.
-# Fixed address, see task-project-link.yaml.
 $type: ButtonLink
 $if: $sources.projectScope.found
-label: Projects
-to: /modules/project/
+label: $sources.projectScope.name
+to: "$concat('/modules/project/p/', $sources.projectScope.id)"

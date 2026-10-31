@@ -28,32 +28,13 @@ let server: DevServer;
 // <workDir>/<id>/dist-module: the packaged fixtures, where `--link <id>=<workDir>/<id>` finds them.
 let linkDir: (id: string) => string;
 
-/** The npm package names the providers are linked under (see checkAgainst). */
-const PACKAGE_OF: Record<(typeof PROVIDERS)[number], string> = {
-  task: '@wadeck-app/app-module-task',
-  queue: '@wadeck-app/app-module-queue',
-  flow: '@wadeck-app/app-module-flow',
-};
-
 /**
- * `app-core-cli check` looks for a provider only among the dependencies of package.json (dependencies, devDependencies, peerDependencies),
- * and `--link` is keyed by the PACKAGE name, not by the module id; the warning "(node_modules, or --link task=<folder>)" suggests the id and
- * does not work. The real package.json lists no provider (the module is independent of them), so the check is run on a COPY of the module
- * whose package.json lists the providers as devDependencies, linked to the given folders.
+ * `app-core-cli check --link <moduleId>=<folder>` (app-core-cli 2026.10.31-145 and later): the folder holds the dist-module of the optional
+ * provider, whatever the dependencies of package.json say (before, a provider was only found among them and linked by PACKAGE name).
  */
 function checkAgainst(folders: Partial<Record<(typeof PROVIDERS)[number], string>>) {
-  const copy = mkdtempSync(join(workDir, 'check-copy-'));
-  for (const entry of ['manifest.json', 'package.json', '.gitignore', 'src']) {
-    cpSync(join(packageDir, entry), join(copy, entry), { recursive: true });
-  }
-  const pkg = JSON.parse(readFileSync(join(copy, 'package.json'), 'utf8')) as { devDependencies: Record<string, string> };
-  const links: string[] = [];
-  for (const [id, folder] of Object.entries(folders)) {
-    pkg.devDependencies[PACKAGE_OF[id as (typeof PROVIDERS)[number]]] = '*';
-    links.push('--link', `${PACKAGE_OF[id as (typeof PROVIDERS)[number]]}=${folder}`);
-  }
-  writeFileSync(join(copy, 'package.json'), JSON.stringify(pkg, null, 2));
-  return runCli(env, 'check', [copy, ...links]);
+  const links = Object.entries(folders).flatMap(([id, folder]) => ['--link', `${id}=${folder}`]);
+  return runCli(env, 'check', [packageDir, ...links]);
 }
 
 async function get(path: string): Promise<{ status: number; body: any }> {
@@ -108,7 +89,7 @@ describe('optional contributions to task, queue and flow', () => {
         const result = runCli(env, command, args);
         expect(result.status, `${command}: ${result.output}`).toBe(0);
         for (const provider of PROVIDERS) {
-          expect(result.output, `${command} must warn about ${provider}`).toContain(`optional module "${provider}" was not found`);
+          expect(result.output, `${command} must warn about ${provider}: the contributions to it are not validated`).toContain(`optional module "${provider}" is not available`);
         }
       }
     });
@@ -148,7 +129,7 @@ describe('optional contributions to task, queue and flow', () => {
       for (const slot of SLOTS[provider]) {
         const { status, body } = await get(`/api/slots/${slot}`);
         expect(status, slot).toBe(200);
-        expect(body, slot).toEqual([expect.objectContaining({ $type: 'ButtonLink', to: '/modules/project/' })]);
+        expect(body, slot).toEqual([expect.objectContaining({ $type: 'ButtonLink', to: expect.stringContaining('$concat(') })]);
       }
     });
 
@@ -180,7 +161,7 @@ describe('optional contributions to task, queue and flow', () => {
     it('validates the contributions against the slots they find: exit 0 and no "not found" warning', () => {
       const result = checkAgainst({ task: linkDir('task'), queue: linkDir('queue'), flow: linkDir('flow') });
       expect(result.status, result.output).toBe(0);
-      expect(result.output).not.toContain('was not found');
+      expect(result.output).not.toContain('is not available');
     });
 
     it('refuses a contribution whose root $type the provider does not accept, naming the slot and the types', () => {
@@ -216,7 +197,7 @@ describe('optional contributions to task, queue and flow', () => {
       }
       const result = checkAgainst(folders);
       expect(result.status, result.output).toBe(0);
-      expect(result.output).not.toContain('was not found');
+      expect(result.output).not.toContain('is not available');
     });
   });
 });
