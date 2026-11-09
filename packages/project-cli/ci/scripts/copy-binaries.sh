@@ -9,8 +9,7 @@ BUNDLE_DIST="packages/project-cli/dist-bundle"
 
 cp "$LAUNCHER_DIST/project_windows_release.exe" packages/project-cli-win32-x64/project.exe
 cp "$LAUNCHER_DIST/project_darwin_arm64_release" packages/project-cli-darwin-arm64/project
-cp "$LAUNCHER_DIST/project_darwin_amd64_release" packages/project-cli-darwin-x64/project
-chmod +x packages/project-cli-darwin-arm64/project packages/project-cli-darwin-x64/project
+chmod +x packages/project-cli-darwin-arm64/project
 cp "$BUNDLE_DIST/project.cjs" packages/project-cli-dist/project.cjs
 cp "$BUNDLE_DIST/project-updater.cjs" packages/project-cli-dist/project-updater.cjs
 cp -r "$BUNDLE_DIST/app-module" packages/project-cli-dist/app-module

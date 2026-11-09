@@ -68,6 +68,15 @@ describe('publish.yml', () => {
     expect(generate.run).toContain('generate-platform-packages.sh project:app-module/');
   });
 
+  it('generates and publishes the Windows and Apple silicon packages only, the same list in every step', () => {
+    const steps = workflow.jobs['publish']!.steps;
+    expect(steps.find((s) => s.run?.includes('generate-platform-packages.sh'))!.env).toEqual({ PLATFORMS: 'win32-x64,darwin-arm64' });
+    for (const step of steps.filter((s) => s.run?.includes('project-cli-win32-x64'))) {
+      expect(step.run, step.name).toContain('project-cli-darwin-arm64');
+      expect(step.run, step.name).not.toContain('darwin-x64');
+    }
+  });
+
   it('exposes the published version as an output of the publish job', () => {
     expect(workflow.jobs['publish']!.outputs).toEqual({ version: '${{ steps.version.outputs.version }}' });
   });

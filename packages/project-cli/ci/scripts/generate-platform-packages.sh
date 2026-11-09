@@ -18,12 +18,36 @@
 #                   Defaults to <script-dir>/../templates.
 #   REGISTRY        npm registry URL (default: https://npm.pkg.github.com/).
 #   PKG_SCOPE       npm scope without leading '@' (default: wadeck-app).
+#   PLATFORMS       Comma list of platforms to generate and support, among win32-x64, darwin-arm64, darwin-x64
+#                   (default: all three). The same list is baked into the shim as {{PLATFORMS}}: any other host
+#                   is refused by the shim with "unsupported platform". Set it explicitly in every consumer.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATES_DIR="${TEMPLATES_DIR:-${SCRIPT_DIR}/../templates}"
 REGISTRY="${REGISTRY:-https://npm.pkg.github.com/}"
 PKG_SCOPE="${PKG_SCOPE:-wadeck-app}"
+PLATFORMS="${PLATFORMS:-win32-x64,darwin-arm64,darwin-x64}"
+
+# platform_os_cpu <key>: prints "<os> <cpu>" for a supported platform key, fails loudly otherwise.
+platform_os_cpu() {
+  case "$1" in
+    win32-x64)    echo "win32 x64" ;;
+    darwin-arm64) echo "darwin arm64" ;;
+    darwin-x64)   echo "darwin x64" ;;
+    *)
+      echo "Error: unsupported platform '$1' in PLATFORMS='${PLATFORMS}'. Allowed: win32-x64, darwin-arm64, darwin-x64." >&2
+      return 1
+      ;;
+  esac
+}
+
+IFS=',' read -ra PLATFORM_LIST <<< "$PLATFORMS"
+if [[ ${#PLATFORM_LIST[@]} -eq 0 || -z "${PLATFORM_LIST[0]}" ]]; then
+  echo "Error: PLATFORMS is empty. Set it to a comma list, e.g. PLATFORMS=win32-x64,darwin-arm64." >&2
+  exit 1
+fi
+for p in "${PLATFORM_LIST[@]}"; do platform_os_cpu "$p" > /dev/null; done
 
 if [[ $# -eq 0 ]]; then
   echo "Error: no CLI names provided." >&2
@@ -70,11 +94,16 @@ generate_dist() {
   for f in "$@"; do
     extra_files_json+="		\"${f}\","$'\n'
   done
+  local optional_json="" sep=""
+  for p in "${PLATFORM_LIST[@]}"; do
+    optional_json+="${sep}"$'\n'"		\"@${PKG_SCOPE}/${cli}-cli-${p}\": \">=0.0.0-0\""
+    sep=","
+  done
   local dir="packages/${cli}-cli-dist"
   mkdir -p "$dir/bin"
 
   # Generate bin/${cli}.js from template
-  sed -e "s/{{CLI_NAME}}/${cli}/g" -e "s/{{PKG_PREFIX}}/${cli}-cli/g" \
+  sed -e "s/{{CLI_NAME}}/${cli}/g" -e "s/{{PKG_PREFIX}}/${cli}-cli/g" -e "s/{{PLATFORMS}}/${PLATFORMS}/g" \
       "${BIN_LAUNCHER_TMPL}" > "$dir/bin/${cli}.js"
   chmod +x "$dir/bin/${cli}.js"
   echo "generated $dir/bin/${cli}.js"
@@ -95,10 +124,7 @@ generate_dist() {
 		"${cli}-updater.cjs",
 ${extra_files_json}		"package.json"
 	],
-	"optionalDependencies": {
-		"@${PKG_SCOPE}/${cli}-cli-win32-x64": ">=0.0.0-0",
-		"@${PKG_SCOPE}/${cli}-cli-darwin-arm64": ">=0.0.0-0",
-		"@${PKG_SCOPE}/${cli}-cli-darwin-x64": ">=0.0.0-0"
+	"optionalDependencies": {${optional_json}
 	},
 	"publishConfig": {
 		"registry": "${REGISTRY}"
@@ -114,8 +140,11 @@ for arg in "$@"; do
   cli="${parts[0]}"
   extra_files=("${parts[@]:1}")
 
-  generate "${cli}-cli-win32-x64"    "win32"  "x64"   "${cli}.exe"
-  generate "${cli}-cli-darwin-arm64" "darwin" "arm64" "${cli}"
-  generate "${cli}-cli-darwin-x64"   "darwin" "x64"   "${cli}"
+  for p in "${PLATFORM_LIST[@]}"; do
+    read -r os cpu <<< "$(platform_os_cpu "$p")"
+    bin_file="${cli}"
+    [[ "$os" == "win32" ]] && bin_file="${cli}.exe"
+    generate "${cli}-cli-${p}" "$os" "$cpu" "$bin_file"
+  done
   generate_dist "${cli}" "${extra_files[@]+"${extra_files[@]}"}"
 done

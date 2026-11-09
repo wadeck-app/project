@@ -29,7 +29,7 @@ function print(io: Io, lines: readonly string[]): number {
 function withoutCommand(argv: readonly string[], dispatch: Dispatch, io: Io): number {
   const [first, second] = dispatch.words;
   if (first === undefined) {
-    if (argv.includes('--version')) {
+    if (argv.includes('--version') || argv.includes('-v')) {
       return print(io, [currentVersion()]);
     }
     if (wantsHelp(argv)) {

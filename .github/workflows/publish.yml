@@ -106,7 +106,10 @@ jobs:
               env:
                   BUNDLE_VERSION: ${{ steps.version.outputs.version }}
 
+            # Windows and Apple silicon only: the shim refuses every other host with a clear message
             - name: Generate platform package directories
+              env:
+                  PLATFORMS: win32-x64,darwin-arm64
               run: bash packages/project-cli/ci/scripts/generate-platform-packages.sh project:app-module/
 
             - name: Copy artifacts to platform packages
@@ -114,7 +117,7 @@ jobs:
 
             - name: Set version in all generated packages
               run: |
-                  for pkg in project-cli-dist project-cli-win32-x64 project-cli-darwin-arm64 project-cli-darwin-x64; do
+                  for pkg in project-cli-dist project-cli-win32-x64 project-cli-darwin-arm64; do
                     (cd "packages/$pkg" && npm pkg set version="${{ steps.version.outputs.version }}")
                   done
 
@@ -145,7 +148,7 @@ jobs:
 
             - name: Publish platform packages
               run: |
-                  for pkg in project-cli-win32-x64 project-cli-darwin-arm64 project-cli-darwin-x64; do
+                  for pkg in project-cli-win32-x64 project-cli-darwin-arm64; do
                     (cd "packages/$pkg" && npm publish --tag ${{ steps.version.outputs.dist_tag }})
                   done
               env:

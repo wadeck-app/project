@@ -128,7 +128,7 @@ isolate_env() {
 
 # --- running the CLI ------------------------------------------------------------------------------------------------
 
-# The bin launcher needs a platform package (win32-x64, darwin-arm64, darwin-x64). There is none for linux yet: there the tests run
+# The bin launcher needs a platform package (win32-x64, darwin-arm64). There is none for linux: there the tests run
 # project.cjs of the global install with node, which is what the launcher starts everywhere else.
 USE_BUNDLE=0
 choose_runner() {

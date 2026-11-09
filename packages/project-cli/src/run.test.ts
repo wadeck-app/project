@@ -18,6 +18,11 @@ describe('run', () => {
     expect(result).toEqual({ code: 0, out: version, err: '' });
   });
 
+  it('accepts -v as a short --version', async () => {
+    const result = await h.cli(['-v']);
+    expect(result).toEqual({ code: 0, out: version, err: '' });
+  });
+
   it('lists every command in the top-level help', async () => {
     const result = await h.cli(['--help']);
     expect(result.code).toBe(0);
