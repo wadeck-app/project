@@ -106,10 +106,12 @@ jobs:
               env:
                   BUNDLE_VERSION: ${{ steps.version.outputs.version }}
 
-            # Windows, Apple silicon and Linux x64 only: the shim refuses every other host with a clear message
+            # Windows, Apple silicon and Linux x64 only: the shim refuses every other host with a clear message.
+            # PKG_VERSION pins the platform packages to this build: the range >=0.0.0-0 does not match a prerelease version, so npm would install none
             - name: Generate platform package directories
               env:
                   PLATFORMS: win32-x64,darwin-arm64,linux-x64
+                  PKG_VERSION: ${{ steps.version.outputs.version }}
               run: bash packages/project-cli/ci/scripts/generate-platform-packages.sh project:app-module/
 
             - name: Copy artifacts to platform packages

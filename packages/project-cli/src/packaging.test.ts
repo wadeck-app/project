@@ -152,7 +152,7 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
 
   function bash(script: string, args: string[] = []): Outcome {
     // PLATFORMS as in publish.yml: Windows, Apple silicon and Linux x64
-    const result = spawnSync(bashCommand(), [join(packageDir, 'ci', 'scripts', script).replace(/\\/g, '/'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, PLATFORMS: 'win32-x64,darwin-arm64,linux-x64' } });
+    const result = spawnSync(bashCommand(), [join(packageDir, 'ci', 'scripts', script).replace(/\\/g, '/'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, PLATFORMS: 'win32-x64,darwin-arm64,linux-x64', PKG_VERSION: STAMP } });
     return { status: result.status, stdout: result.stdout, stderr: result.stderr };
   }
 
@@ -187,9 +187,9 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
       name: '@wadeck-app/project-cli',
       bin: { project: './bin/project.js' },
       optionalDependencies: {
-        '@wadeck-app/project-cli-win32-x64': expect.any(String),
-        '@wadeck-app/project-cli-darwin-arm64': expect.any(String),
-        '@wadeck-app/project-cli-linux-x64': expect.any(String),
+        '@wadeck-app/project-cli-win32-x64': STAMP,
+        '@wadeck-app/project-cli-darwin-arm64': STAMP,
+        '@wadeck-app/project-cli-linux-x64': STAMP,
       },
     });
     expect(Object.keys((packageJson('project-cli-dist') as { optionalDependencies: object }).optionalDependencies)).toHaveLength(3);

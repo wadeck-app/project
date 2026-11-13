@@ -64,6 +64,15 @@ fail() {
   exit 1
 }
 
+# The platform package (the Go launcher) must come with the install: its optionalDependencies range must match the version
+# (the range >=0.0.0-0 does not match a prerelease version, npm then silently installs none and only `start` would fetch it).
+assert_platform_package_installed() {
+  local listed
+  listed="$(npm ls -g --all --parseable 2>/dev/null | grep -c 'project-cli-\(win32\|darwin\|linux\)-' || true)"
+  [ "$listed" -ge 1 ] || fail "no platform package (@wadeck-app/project-cli-<os>-<cpu>) was installed with the CLI: check the optionalDependencies of the published main package"
+  echo "ok: a platform package is installed ($listed)"
+}
+
 assert_equals() {
   local what="$1" expected="$2" actual="$3"
   if [ "$expected" != "$actual" ]; then

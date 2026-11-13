@@ -44,6 +44,15 @@ describe('ci/scripts/verify-lib.sh', () => {
     expect(failed.stderr).toContain("the version: expected '1', got '2'");
   });
 
+  it('assert_platform_package_installed passes when npm lists a platform package and fails loudly when none was installed', () => {
+    const present = bash('npm() { echo /g/node_modules/@wadeck-app/project-cli; echo /g/node_modules/@wadeck-app/project-cli-linux-x64; }; export -f npm; assert_platform_package_installed');
+    expect(present.status, present.stderr).toBe(0);
+    const absent = bash('npm() { echo /g/node_modules/@wadeck-app/project-cli; }; export -f npm; assert_platform_package_installed');
+    expect(absent.status).not.toBe(0);
+    expect(absent.stderr).toContain('no platform package');
+    expect(absent.stderr).toContain('optionalDependencies');
+  });
+
   it('the scripts have a header saying how to run them locally', () => {
     for (const script of ['verify-install.sh', 'verify-update.sh', 'verify-lib.sh']) {
       const header = readFileSync(join(scripts, script), 'utf8').split('\n').slice(0, 12).join('\n');

@@ -17,6 +17,7 @@ isolate_env
 
 step "(a) npm install -g @wadeck-app/project-cli@$VERSION"
 install_global "@wadeck-app/project-cli@$VERSION"
+assert_platform_package_installed
 first_run
 
 step "(b) project --version prints exactly the version"

@@ -70,7 +70,7 @@ describe('publish.yml', () => {
 
   it('generates and publishes the Windows, Apple silicon and Linux x64 packages only, the same list in every step', () => {
     const steps = workflow.jobs['publish']!.steps;
-    expect(steps.find((s) => s.run?.includes('generate-platform-packages.sh'))!.env).toEqual({ PLATFORMS: 'win32-x64,darwin-arm64,linux-x64' });
+    expect(steps.find((s) => s.run?.includes('generate-platform-packages.sh'))!.env).toEqual({ PLATFORMS: 'win32-x64,darwin-arm64,linux-x64', PKG_VERSION: '${{ steps.version.outputs.version }}' });
     for (const step of steps.filter((s) => s.run?.includes('project-cli-win32-x64'))) {
       expect(step.run, step.name).toContain('project-cli-darwin-arm64');
       expect(step.run, step.name).toContain('project-cli-linux-x64');
