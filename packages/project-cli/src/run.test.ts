@@ -31,6 +31,7 @@ describe('run', () => {
       expect(result.out).toContain(`project ${name}`);
     }
     expect(result.out).toContain('--project');
+    expect(result.out).toContain('-v, --version');
   });
 
   it('prints the help of one command, with its options', async () => {

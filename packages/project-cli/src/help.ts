@@ -42,7 +42,7 @@ export function topHelp(commands: readonly Command[]): string[] {
     ...commandLines(commands),
     '',
     'Options (all commands):',
-    ...optionLines({ ...globalOptions(), version: { type: 'boolean', description: 'Print the version (without a command)' } }),
+    ...optionLines({ ...globalOptions(), version: { type: 'boolean', short: 'v', description: 'Print the version (without a command)' } }),
     '',
     "Run 'project <command> --help' for the options of one command.",
     REGISTRY_NOTE,
