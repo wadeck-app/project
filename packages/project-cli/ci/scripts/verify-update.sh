@@ -38,7 +38,6 @@ echo "previous version: $PREVIOUS"
 
 step "(e1) npm install -g $PACKAGE@$PREVIOUS"
 install_global "$PACKAGE@$PREVIOUS"
-choose_runner
 first_run
 ACTUAL="$(installed_version)"
 assert_equals "installed version" "$PREVIOUS" "$ACTUAL"

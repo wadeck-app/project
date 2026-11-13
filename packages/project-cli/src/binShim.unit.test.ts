@@ -40,7 +40,7 @@ function loadRun(): (deps: Deps) => number {
   const source = readFileSync(TEMPLATE, 'utf8')
     .replaceAll('{{CLI_NAME}}', 'project')
     .replaceAll('{{PKG_PREFIX}}', 'project-cli')
-    .replaceAll('{{PLATFORMS}}', 'win32-x64,darwin-arm64')
+    .replaceAll('{{PLATFORMS}}', 'win32-x64,darwin-arm64,linux-x64')
     .replace(/^#!.*\n/, '');
   const mod: { exports: { run?: (deps: Deps) => number } } = { exports: {} };
   // require.main is undefined here, so `require.main === module` is false: the shim does not run itself.
@@ -180,12 +180,11 @@ describe('bin shim: common path (every command but start)', () => {
   });
 });
 
-// Owner decision: Intel Macs (and linux, and every other platform) are not supported at all, so no command runs there,
+// Owner decision: Intel Macs and every platform outside win32-x64, darwin-arm64 and linux-x64 are not supported at all, so no command runs there,
 // not even the ones that only need node.
 describe('bin shim: unsupported platforms fail early and loudly', () => {
   const platforms: [string, string][] = [
     ['darwin', 'x64'],
-    ['linux', 'x64'],
     ['linux', 'arm64'],
     ['win32', 'arm64'],
     ['win32', 'ia32'],
@@ -213,7 +212,7 @@ describe('bin shim: unsupported platforms fail early and loudly', () => {
       expect(run(t.deps)).toBe(1);
 
       expect(t.err()).toBe(
-        `project: unsupported platform ${platform}-${arch}. Supported: win32-x64, darwin-arm64.\n`
+        `project: unsupported platform ${platform}-${arch}. Supported: win32-x64, darwin-arm64, linux-x64.\n`
       );
       expect(t.out()).toBe('');
       expect(t.calls).toHaveLength(0);
@@ -254,6 +253,7 @@ describe('bin shim: start (the only command that needs the Go launcher)', () => 
   it.each([
     ['darwin', 'arm64', '@wadeck-app/project-cli-darwin-arm64/project'],
     ['win32', 'x64', '@wadeck-app/project-cli-win32-x64/project.exe'],
+    ['linux', 'x64', '@wadeck-app/project-cli-linux-x64/project'],
   ])('%s-%s: runs the launcher with LAUNCHER_BUNDLE_OVERRIDE and the args', (platform, arch, spec) => {
     const run = loadRun();
     const t = setup({ platform, arch, args: ['start', '--x'] });

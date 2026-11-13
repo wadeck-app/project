@@ -128,24 +128,9 @@ isolate_env() {
 
 # --- running the CLI ------------------------------------------------------------------------------------------------
 
-# The bin launcher needs a platform package (win32-x64, darwin-arm64). There is none for linux: there the tests run
-# project.cjs of the global install with node, which is what the launcher starts everywhere else.
-USE_BUNDLE=0
-choose_runner() {
-  if [ "$(uname -s)" = "Linux" ]; then
-    USE_BUNDLE=1
-    echo "linux: the bin launcher has no linux-x64 platform package yet (ci-templates), running project.cjs of the global install with node instead of the 'project' command"
-  else
-    USE_BUNDLE=0
-  fi
-}
-
+# The installed `project` command (the bin shim of the global install) runs on every platform of the release: win32-x64, darwin-arm64, linux-x64.
 project() {
-  if [ "$USE_BUNDLE" = "1" ]; then
-    node "$(npm root -g)/@wadeck-app/project-cli/project.cjs" "$@"
-  else
-    command project "$@"
-  fi
+  command project "$@"
 }
 
 # Runs `project` with its stdout and stderr kept apart in files (never mixed in a value to compare), shows both in the log, and returns its status.

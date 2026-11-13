@@ -44,14 +44,6 @@ describe('ci/scripts/verify-lib.sh', () => {
     expect(failed.stderr).toContain("the version: expected '1', got '2'");
   });
 
-  it('uses the bundle directly, saying why, where the bin launcher has no platform package (linux), and the bin elsewhere', () => {
-    const linux = bash('uname() { echo Linux; }; export -f uname; choose_runner; echo "$USE_BUNDLE"');
-    expect(linux.stdout).toContain('linux: the bin launcher has no linux-x64 platform package yet');
-    expect(lines(linux.stdout).pop()).toBe('1');
-    const mac = bash('uname() { echo Darwin; }; export -f uname; choose_runner; echo "$USE_BUNDLE"');
-    expect(lines(mac.stdout).pop()).toBe('0');
-  });
-
   it('the scripts have a header saying how to run them locally', () => {
     for (const script of ['verify-install.sh', 'verify-update.sh', 'verify-lib.sh']) {
       const header = readFileSync(join(scripts, script), 'utf8').split('\n').slice(0, 12).join('\n');

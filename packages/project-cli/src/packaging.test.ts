@@ -151,8 +151,8 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
   let root: string;
 
   function bash(script: string, args: string[] = []): Outcome {
-    // PLATFORMS as in publish.yml: Windows and Apple silicon only
-    const result = spawnSync(bashCommand(), [join(packageDir, 'ci', 'scripts', script).replace(/\\/g, '/'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, PLATFORMS: 'win32-x64,darwin-arm64' } });
+    // PLATFORMS as in publish.yml: Windows, Apple silicon and Linux x64
+    const result = spawnSync(bashCommand(), [join(packageDir, 'ci', 'scripts', script).replace(/\\/g, '/'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, PLATFORMS: 'win32-x64,darwin-arm64,linux-x64' } });
     return { status: result.status, stdout: result.stdout, stderr: result.stderr };
   }
 
@@ -170,7 +170,7 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
     root = mkdtempSync(join(tmpdir(), 'project-cli-dist-'));
     const cli = join(root, 'packages', 'project-cli');
     mkdirSync(join(cli, 'launcher-go', 'dist'), { recursive: true });
-    for (const launcher of ['project_windows_release.exe', 'project_darwin_arm64_release']) {
+    for (const launcher of ['project_windows_release.exe', 'project_darwin_arm64_release', 'project_linux_amd64_release']) {
       writeFileSync(join(cli, 'launcher-go', 'dist', launcher), `fake ${launcher}`);
     }
     cpSync(bundleDir, join(cli, 'dist-bundle'), { recursive: true });
@@ -179,7 +179,7 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
 
   afterAll(() => removeTempDir(root));
 
-  it('generates the dist package under the published name, and the 2 platform packages', () => {
+  it('generates the dist package under the published name, and the 3 platform packages', () => {
     // The extra after ':' puts the app-module folder in the files of the dist package.
     const generated = bash('generate-platform-packages.sh', ['project:app-module/']);
     expect(generated.status, generated.stderr).toBe(0);
@@ -189,21 +189,24 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
       optionalDependencies: {
         '@wadeck-app/project-cli-win32-x64': expect.any(String),
         '@wadeck-app/project-cli-darwin-arm64': expect.any(String),
+        '@wadeck-app/project-cli-linux-x64': expect.any(String),
       },
     });
-    expect(Object.keys((packageJson('project-cli-dist') as { optionalDependencies: object }).optionalDependencies)).toHaveLength(2);
+    expect(Object.keys((packageJson('project-cli-dist') as { optionalDependencies: object }).optionalDependencies)).toHaveLength(3);
     expect(existsSync(join(root, 'packages', 'project-cli-darwin-x64'))).toBe(false);
     expect(packageJson('project-cli-dist')).not.toHaveProperty('private', true);
     expect(packageJson('project-cli-dist')).not.toHaveProperty('dependencies');
     expect((packageJson('project-cli-dist') as { files: string[] }).files).toContain('app-module/');
     expect(packageJson('project-cli-win32-x64')).toMatchObject({ name: '@wadeck-app/project-cli-win32-x64', os: ['win32'], cpu: ['x64'], files: ['project.exe'] });
-    expect(packageJson('project-cli-darwin-arm64')).toMatchObject({ name: '@wadeck-app/project-cli-darwin-arm64', os: ['darwin'], cpu: ['arm64'], files: ['project'] });  });
+    expect(packageJson('project-cli-darwin-arm64')).toMatchObject({ name: '@wadeck-app/project-cli-darwin-arm64', os: ['darwin'], cpu: ['arm64'], files: ['project'] });
+    expect(packageJson('project-cli-linux-x64')).toMatchObject({ name: '@wadeck-app/project-cli-linux-x64', os: ['linux'], cpu: ['x64'], files: ['project'] });
+  });
 
   it('generates a launcher that starts with a node shebang and names the platform packages', () => {
     const launcher = readFileSync(join(root, 'packages', 'project-cli-dist', 'bin', 'project.js'), 'utf8');
     expect(launcher.split('\n')[0]).toBe('#!/usr/bin/env node');
     // The shim builds the platform package names from the PLATFORMS list that generate-platform-packages.sh baked in
-    expect(launcher).toContain("'win32-x64,darwin-arm64'.split(',')");
+    expect(launcher).toContain("'win32-x64,darwin-arm64,linux-x64'.split(',')");
     expect(launcher).toContain('@wadeck-app/project-cli-');
     expect(launcher).toContain("'project.cjs'");
     expect(launcher).not.toContain('{{');
@@ -212,7 +215,7 @@ describe('the generated packages (ci/scripts/generate-platform-packages.sh, copy
   it('copies the launchers, the bundles, the app-module and the README into the packages', () => {
     const copied = bash('copy-binaries.sh');
     expect(copied.status, copied.stderr).toBe(0);
-    for (const file of ['project-cli-win32-x64/project.exe', 'project-cli-darwin-arm64/project']) {
+    for (const file of ['project-cli-win32-x64/project.exe', 'project-cli-darwin-arm64/project', 'project-cli-linux-x64/project']) {
       expect(existsSync(join(root, 'packages', file)), file).toBe(true);
     }
     expect(filesUnder(join(root, 'packages', 'project-cli-dist', 'app-module'))).toEqual(filesUnder(join(bundleDir, 'app-module')));
