@@ -7,6 +7,7 @@
 ## Scope
 
 Local, single-user machine. Cross-project reads/writes between task, flow and queue, plus a global project registry.
+Remote machines: trusted only once registered with the machine CLI, each registration signed with the admin key (P-2, user decision 2026-11-13). Authentication of a remote caller and the origin it carries belong to the machine CLI's threat model, not to this one.
 
 ## Assets
 
