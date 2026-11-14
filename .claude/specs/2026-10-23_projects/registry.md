@@ -31,6 +31,7 @@ Where project metadata and per-project tool config live. Owned and accessed only
 | 26 | Full validation (uniqueness, one `main`, parents/cycles, paths exist) on write only; reads keep cheap loud checks (unreadable JSON, unknown schema version, ambiguous reference). | Path-existence checks are slow | 2026-10-24 |
 | 28 | Labels: optional `labels: string[]` on a project, each `key::value` or bare `value`, lowercase, syntax `^[a-z0-9][a-z0-9._-]*$` max 64, at most one `::`, max 32 per project, set semantics (several values per key allowed), not inherited, kept on soft delete. Details in `_index.md` Decision #28. | Meta information (state::production, sandbox, ...) | 2026-10-24 |
 | 4 | All registry writes (index and per-project files) are atomic (write to temp file, then rename). | User: "atomic write is important"; a half-written index would break every command | 2026-10-24 |
+| 29 | P-2 reaches a remote machine only once it is registered with the machine CLI and the registration is signed with the admin key; an unregistered or unsigned peer is not trusted. The registry holds no key and checks none: signing, verification and origin of forwarded actions belong to the machine CLI. | User: "les machines enregistrées sont trustées, tout enregistrement doit se faire en utilisant la clef admin pour la signer, ainsi on reste dans du trust" (answer to machine-owner's question on P-2) | 2026-11-13 |
 
 ## Design (as stated; unsettled points listed below)
 
