@@ -27,6 +27,7 @@ export const addCommand: PlainCommand = {
     name: { type: 'string', description: 'Project name (default: the lowercased folder name)' },
     alias: { type: 'list', description: 'Alias, repeatable' },
     parent: { type: 'string', valueName: 'ref', description: 'Parent project (name, alias or id) it inherits its configuration from' },
+    slug: { type: 'string', description: 'Folder name of the project in the registry, kebab-case ASCII, 1 to 20 characters (default: derived from the name)' },
     git: { type: 'string', valueName: 'value', description: 'Git repository of the project, stored as given' },
     label: { type: 'list', valueName: 'label', description: "Label, 'key::value' or a bare value, repeatable" },
     virtual: { type: 'boolean', description: 'Register a project without path, to hold configuration shared by others (needs --name)' },
@@ -45,10 +46,11 @@ export const addCommand: PlainCommand = {
     const name = explicitName ?? nameFromFolder(path!);
     const parent = options.value('parent');
     const git = options.value('git');
+    const slug = options.value('slug');
     try {
       const project = await addProject(
         context.registryDir,
-        { name, aliases: options.list('alias'), labels: options.list('label'), ...(path === undefined ? {} : { path }), ...(parent === undefined ? {} : { parent }), ...(git === undefined ? {} : { git }) },
+        { name, aliases: options.list('alias'), labels: options.list('label'), ...(path === undefined ? {} : { path }), ...(parent === undefined ? {} : { parent }), ...(git === undefined ? {} : { git }), ...(slug === undefined ? {} : { slug }) },
         { lock: context.lock },
       );
       return { json: forJson(project), lines: [`added ${describeProject(project)}`, ...pathLines(project, '  path: '), ...((project.labels ?? []).length > 0 ? [`  labels: ${labelList(project)}`] : [])], mutation: `add project ${describeProject(project)}` };

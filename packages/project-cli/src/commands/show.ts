@@ -16,6 +16,7 @@ export const showCommand: TargetCommand = {
       json: { ...forJson(project), chain: chain.map(({ id, name }) => ({ id, name })), folder },
       lines: [
         describeProject(project),
+        `  slug: ${project.slug ?? 'none'}`,
         `  aliases: ${project.aliases.join(', ') || 'none'}`,
         `  labels: ${labelList(project)}`,
         `  parent chain: ${chain.length > 1 ? chain.map((p) => p.name).join(' > ') : 'none'}`,

@@ -38,7 +38,7 @@ describe('run', () => {
     const result = await h.cli(['--help']);
     expect(result.code).toBe(0);
     expect(result.err).toBe('');
-    for (const name of ['add', 'list', 'show', 'path', 'resolve', 'rename', 'alias add', 'alias remove', 'parent set', 'parent clear', 'git set', 'git clear', 'paths add', 'paths remove', 'paths move', 'paths main', 'remove']) {
+    for (const name of ['add', 'list', 'show', 'path', 'resolve', 'rename', 'slug', 'alias add', 'alias remove', 'parent set', 'parent clear', 'git set', 'git clear', 'paths add', 'paths remove', 'paths move', 'paths main', 'remove']) {
       expect(result.out).toContain(`project ${name}`);
     }
     expect(result.out).toContain('--project');

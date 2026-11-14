@@ -8,6 +8,8 @@ export interface Project {
   /** 8 lowercase hex chars, immutable. */
   id: string;
   name: string;
+  /** Folder-name part (`projects/<id>-<slug>`), kebab-case ASCII, 1 to 20 chars, see slug.ts. Missing in a registry written before slugs existed, or when the name has no ASCII letter or digit. Renaming it moves the folder; renaming the name does not. */
+  slug?: string;
   aliases: string[];
   /** Id of the parent project (inheritance link). */
   parent?: string;

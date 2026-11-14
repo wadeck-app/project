@@ -14,7 +14,7 @@ const FUNCTIONS = [
   'addProject', 'renameProject', 'addAlias', 'removeAlias', 'setParent', 'setGit', 'removeProject',
   'addPath', 'removePath', 'movePath', 'setMain',
   'resolveReference', 'levenshtein', 'findProjectForPath', 'resolveScope', 'describeResolution', 'requirePath',
-  'getChain', 'getChildren', 'getDescendants', 'getAncestors', 'projectToolDir', 'getConfigLayers', 'validateLayer', 'mergeLayers',
+  'getChain', 'getChildren', 'getDescendants', 'getAncestors', 'projectToolDir', 'getConfigLayers', 'slugify', 'validateSlug', 'renameSlug', 'validateLayer', 'mergeLayers',
 ] as const;
 
 const ERRORS = [
@@ -22,9 +22,15 @@ const ERRORS = [
   'InvalidToolError', 'InvalidIdError', 'AtomicWriteError', 'LockTimeoutError', 'LockLostError', 'RegistryCorruptError',
   'RegistryInvalidError', 'ProjectNotFoundError', 'AmbiguousReferenceError', 'NoProjectInScopeError', 'VirtualProjectError',
   'DanglingParentError', 'ParentCycleError', 'ConfigSchemaError', 'UnsupportedSchemaVersionError', 'InvalidProjectLabelError', 'InvalidLabelSelectorError', 'ProjectLabelNotFoundError', 'ProjectOptionError', 'InvalidQualifiedIdError', 'RestoreConflictError',
+  'InvalidSlugError', 'ProjectDirAmbiguousError', 'SlugFolderExistsError', 'ProjectFolderInUseError', 'SlugRenameFailedError',
 ] as const;
 
 const DETAILS: Record<string, unknown> = {
+  InvalidSlugError: { slug: 'x' },
+  ProjectDirAmbiguousError: { projectId: '00000001', folders: [] },
+  SlugFolderExistsError: { folder: 'f' },
+  ProjectFolderInUseError: { from: 'a', to: 'b', osCode: 'EBUSY' },
+  SlugRenameFailedError: { from: 'a', to: 'b', restored: true },
   LabelTakenError: { kind: 'name', label: 'x' },
   NoProjectInScopeError: { cwd: '/', registered: [], hint: 'h' },
   HasChildrenError: { project: { id: '00000001', name: 'a' }, children: [] },

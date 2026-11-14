@@ -29,6 +29,7 @@ Base `/api/modules/project`. Bodies are JSON objects; an unknown field is a 400.
 | `GET /tree`, `GET /deleted` | |
 | `POST /projects` | `name`, `path?`, `aliases?`, `labels?`, `parent?`, `git?`, `virtual?` (201) |
 | `PUT /projects/:ref/name` | `name` |
+| `PUT /projects/:ref/slug` | `slug`; **moves the project folder** (400 invalid slug, 409 two folders for the project or the OS refuses the move because a tool holds it, nothing changed) |
 | `POST` / `DELETE /projects/:ref/aliases` | `alias` |
 | `POST` / `DELETE /projects/:ref/labels` | `labels` (list or text) |
 | `PUT /projects/:ref/parent`, `DELETE` | `parent` |
@@ -58,7 +59,7 @@ A client that is not a browser sends no `Origin` and passes if it sends the othe
 
 ### Layout of the project page
 
-`/p/:project` is organised in tabs (`PageTabs`, the selected one is the URL parameter `tab`, so a tab can be linked and survives a reload): **Overview** (a table with what each module counts for the project, the modules that could not answer, then the `project:project-panels` slot), **Tasks**, **Flows**, **Queue** (what that module says about the project, from the `related` route: `tabs.<module>` of the response, with the reason when a module has nothing or did not answer), **Settings** (identity, hierarchy, folders, removal). The tool tabs are fixed (task, flow, queue: the `optionalRequires`); a module outside that list appears only in the overview table and the slot. The statistics are the counts the modules send (`count` + `countLabel`, shown as `countText`): they have different units, so there is no chart; per-state or over-time figures need a contract extension on the `related` response.
+`/p/:project` is organised in tabs (`PageTabs`, the selected one is the URL parameter `tab`, so a tab can be linked and survives a reload): **Overview** (a table with what each module counts for the project, the modules that could not answer, then the `project:project-panels` slot), **Tasks**, **Flows**, **Queue** (what that module says about the project, from the `related` route: `tabs.<module>` of the response, with the reason when a module has nothing or did not answer), **Settings** (identity with the folder name (slug) form, hierarchy, folders, removal). The tool tabs are fixed (task, flow, queue: the `optionalRequires`); a module outside that list appears only in the overview table and the slot. The statistics are the counts the modules send (`count` + `countLabel`, shown as `countText`): they have different units, so there is no chart; per-state or over-time figures need a contract extension on the `related` response.
 
 ### What other modules can add to the project page
 

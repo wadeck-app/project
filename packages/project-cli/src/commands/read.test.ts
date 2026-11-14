@@ -58,6 +58,7 @@ describe('read commands', () => {
       expect(result.code).toBe(0);
       expect(result.out.split('\n')).toEqual([
         `shop (${idOf('shop')})`,
+        '  slug: shop',
         '  aliases: sh',
         '  labels: none',
         `  parent chain: base > shop`,
@@ -65,7 +66,7 @@ describe('read commands', () => {
         `    ${native(shop)} (main)`,
         `    ${native(wt)}`,
         '  git: git@x:shop.git',
-        `  folder: ${native(`${h.registryDir.replace(/\\/g, '/')}/projects/${idOf('shop')}`)}`,
+        `  folder: ${native(`${h.registryDir.replace(/\\/g, '/')}/projects/${idOf('shop')}-shop`)}`,
       ]);
     });
 
@@ -91,19 +92,19 @@ describe('read commands', () => {
     it('prints the project, its chain and its folder as JSON', async () => {
       const json = JSON.parse((await h.cli(['show', 'shop', '--json'])).out);
       expect(json).toMatchObject({ id: idOf('shop'), name: 'shop', aliases: ['sh'], chain: [{ name: 'base' }, { name: 'shop' }] });
-      expect(json.folder).toBe(`${h.registryDir.replace(/\\/g, '/')}/projects/${idOf('shop')}`);
+      expect(json.folder).toBe(`${h.registryDir.replace(/\\/g, '/')}/projects/${idOf('shop')}-shop`);
     });
   });
 
   describe('path', () => {
     it('prints the folder of the project in the registry', async () => {
       const result = await h.cli(['path', 'shop']);
-      expect(result.out).toBe(`${h.registryDir.replace(/\\/g, '/')}/projects/${idOf('shop')}`);
+      expect(result.out).toBe(`${h.registryDir.replace(/\\/g, '/')}/projects/${idOf('shop')}-shop`);
     });
 
     it('prints it as JSON', async () => {
       const result = await h.cli(['path', 'shop', '--json']);
-      expect(JSON.parse(result.out)).toEqual({ path: `${h.registryDir.replace(/\\/g, '/')}/projects/${idOf('shop')}` });
+      expect(JSON.parse(result.out)).toEqual({ path: `${h.registryDir.replace(/\\/g, '/')}/projects/${idOf('shop')}-shop` });
     });
   });
 

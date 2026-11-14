@@ -33,6 +33,12 @@ $actions:
     successMessage: Project renamed
     errorPrefix: Could not rename
     reloadSources: true
+  setSlug:
+    url: PUT /api/modules/project/projects/{ref}/slug
+    confirm: Change the folder name? The folder of this project in the registry is MOVED to the new name. Stop the tools that use it first (the daemons of task, queue and flow), or the move is refused and nothing changes.
+    successMessage: Folder name changed, the folder was moved
+    errorPrefix: Could not change the folder name (nothing was changed unless the message says otherwise)
+    reloadSources: true
   addAlias:
     url: POST /api/modules/project/projects/{ref}/aliases
     successMessage: Alias added
@@ -329,6 +335,8 @@ sections:
                               label: $sources.detail.project.labelsLine
                             - $type: Badge
                               label: $sources.detail.project.gitLine
+                            - $type: Badge
+                              label: $sources.detail.project.slugLine
                         - &fRename
                           $type: Form
                           onSubmit: $ctx.rename
@@ -341,6 +349,18 @@ sections:
                           actions:
                             - $type: ButtonSave
                               label: Rename
+                        - &fSetSlug
+                          $type: Form
+                          onSubmit: $ctx.setSlug
+                          initialData: $sources.detail.forms.slug
+                          fields:
+                            - $type: FieldText
+                              label: Folder name (slug, kebab-case, 1 to 20 characters; changing it moves the folder)
+                              bind: slug
+                              required: true
+                          actions:
+                            - $type: ButtonSave
+                              label: Change the folder name
                         - &fAddAlias
                           $type: Form
                           onSubmit: $ctx.addAlias
@@ -711,8 +731,8 @@ sections:
                       items:
                         - &editIdentity
                           $type: Collapsible
-                          title: Rename, aliases, labels, git url
-                          items: [*fRename, *fAddAlias, *fRemoveAlias, *fAddLabels, *fRemoveLabels, *fSetGit, *fClearGit]
+                          title: Rename, folder name, aliases, labels, git url
+                          items: [*fRename, *fSetSlug, *fAddAlias, *fRemoveAlias, *fAddLabels, *fRemoveLabels, *fSetGit, *fClearGit]
                     - $type: Section
                       title: Danger zone
                       items:

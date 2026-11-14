@@ -89,7 +89,7 @@ function restoreOne(registry: Registry, all: DeletedProject[], entry: DeletedPro
 }
 
 /**
- * Brings a soft-deleted project back (its folder projects/<id>/, with the data, was never deleted). `ref` is an exact id, or an exact name or
+ * Brings a soft-deleted project back (its project folder, with the data, was never deleted). `ref` is an exact id, or an exact name or
  * alias among the deleted projects. The parent must be live; with `recursive` the deleted descendants come back too, parents before children,
  * all of them or none. Any collision with a live project (name, alias, path), a path that is gone, or a missing parent is an error naming what is
  * in the way, and nothing changes. registry.json is written first, then the entry leaves deleted_projects.json: after a crash an id may be in both

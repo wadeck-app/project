@@ -3,7 +3,7 @@ import { projectFolder } from '../format.js';
 
 export const pathCommand: TargetCommand = {
   name: 'path',
-  summary: 'Print the folder of a project in the registry (<registry>/projects/<id>)',
+  summary: 'Print the folder of a project in the registry (<registry>/projects/<id>-<slug>)',
   target: 'ref',
   args: [],
   options: {},

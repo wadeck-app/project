@@ -61,13 +61,13 @@ describe('projectToolDir', () => {
 });
 
 describe('getConfigLayers', () => {
-  it('returns the config dirs root-first, without any I/O', () => {
+  it('returns the config dirs root-first (<id>-<slug> from the registry given, nothing created)', () => {
     const root = makeProject(1);
     const leaf = makeProject(2, { parent: root.id });
     const layers = getConfigLayers(makeRegistry(leaf, root), '/reg', leaf, 'task');
     expect(layers).toEqual([
-      { project: root, dir: join('/reg', 'projects', '00000001', 'task', 'config') },
-      { project: leaf, dir: join('/reg', 'projects', '00000002', 'task', 'config') },
+      { project: root, dir: join('/reg', 'projects', '00000001-p1', 'task', 'config') },
+      { project: leaf, dir: join('/reg', 'projects', '00000002-p2', 'task', 'config') },
     ]);
   });
 
@@ -93,7 +93,7 @@ describe('defaultRegistryDir without a home argument', () => {
 });
 
 describe('projectDir', () => {
-  it('is <registryDir>/projects/<id>, the parent of every tool folder', () => {
+  it('is <registryDir>/projects/<id> for an id that is not in the registry, the parent of every tool folder', () => {
     expect(projectDir(join('reg'), '3fa9c1d2')).toBe(join('reg', 'projects', '3fa9c1d2'));
     expect(projectToolDir(join('reg'), '3fa9c1d2', 'task', 'data')).toBe(join(projectDir('reg', '3fa9c1d2'), 'task', 'data'));
   });

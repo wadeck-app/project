@@ -14,7 +14,7 @@ function collectSubtree(registry: Registry, root: Project): Project[] {
 }
 
 /**
- * Soft delete: the entry moves to deleted_projects.json; the folder projects/<id>/ is never touched.
+ * Soft delete: the entry moves to deleted_projects.json; the project folder (projects/<id>-<slug>) is never touched.
  * A project with children is refused unless `recursive` (then all descendants are deleted with it).
  * Returns the deleted entries, the requested project first.
  */

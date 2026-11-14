@@ -13,6 +13,7 @@ import { restoreCommand } from './restore.js';
 import { renameCommand } from './rename.js';
 import { resolveCommand } from './resolve.js';
 import { showCommand } from './show.js';
+import { slugCommand } from './slug.js';
 
 /** Order of the help output. */
 export const COMMANDS: Command[] = [
@@ -22,6 +23,7 @@ export const COMMANDS: Command[] = [
   pathCommand,
   resolveCommand,
   renameCommand,
+  slugCommand,
   aliasAddCommand,
   aliasRemoveCommand,
   parentSetCommand,

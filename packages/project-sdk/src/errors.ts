@@ -282,3 +282,66 @@ export class InvalidRelatedResponseError extends ProjectError {
     this.reason = details.reason;
   }
 }
+
+/** A slug (folder name part of a project) that breaks the rule, see validateSlug. */
+export class InvalidSlugError extends ProjectError {
+  /** The slug as it was given. */
+  readonly slug: string;
+
+  constructor(message: string, details: { slug: string }) {
+    super('INVALID_SLUG', message);
+    this.slug = details.slug;
+  }
+}
+
+/** Two or more folders of `<registryDir>/projects/` claim the data of the same project (`<id>` and `<id>-<slug>`, or two slugs). Never resolved by guessing. */
+export class ProjectDirAmbiguousError extends ProjectError {
+  readonly projectId: string;
+  /** Absolute paths of the folders, sorted. */
+  readonly folders: string[];
+
+  constructor(message: string, details: { projectId: string; folders: string[] }) {
+    super('PROJECT_DIR_AMBIGUOUS', message);
+    this.projectId = details.projectId;
+    this.folders = details.folders;
+  }
+}
+
+/** The folder a slug rename would create is already there. */
+export class SlugFolderExistsError extends ProjectError {
+  readonly folder: string;
+
+  constructor(message: string, details: { folder: string }) {
+    super('SLUG_FOLDER_EXISTS', message);
+    this.folder = details.folder;
+  }
+}
+
+/** The OS refused to move the project folder (a tool daemon probably holds files open in it). Nothing was changed. */
+export class ProjectFolderInUseError extends ProjectError {
+  readonly from: string;
+  readonly to: string;
+  /** The OS error code (EBUSY, EPERM, EACCES, ENOTEMPTY). */
+  readonly osCode: string;
+
+  constructor(message: string, details: { from: string; to: string; osCode: string }) {
+    super('PROJECT_FOLDER_IN_USE', message);
+    this.from = details.from;
+    this.to = details.to;
+    this.osCode = details.osCode;
+  }
+}
+
+/** The folder was moved but registry.json could not be written. `restored` tells whether the folder is back at its old place. */
+export class SlugRenameFailedError extends ProjectError {
+  readonly from: string;
+  readonly to: string;
+  readonly restored: boolean;
+
+  constructor(message: string, details: { from: string; to: string; restored: boolean }) {
+    super('SLUG_RENAME_FAILED', message);
+    this.from = details.from;
+    this.to = details.to;
+    this.restored = details.restored;
+  }
+}

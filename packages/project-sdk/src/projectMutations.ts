@@ -7,11 +7,14 @@ import { MAX_PROJECT_LABELS, assertLabelCount, normalizeLabelSet } from './proje
 import { resolveReference } from './references.js';
 import { loadDeleted } from './registryIo.js';
 import type { Project } from './types.js';
+import { slugify, validateSlug } from './slug.js';
 import { type MutationOptions, updateRegistry } from './update.js';
 import { describeProject } from './projects.js';
 
 export interface AddProjectInput {
   name: string;
+  /** Folder-name part, validated (see validateSlug). Default: slugify(name), none when that is empty. */
+  slug?: string;
   aliases?: string[];
   /** First path of the project, registered as its main path. Must exist and be a directory. */
   path?: string;
@@ -22,12 +25,16 @@ export interface AddProjectInput {
   labels?: string[];
 }
 
-/** Registers a project. A project without path is "virtual". */
+/** Registers a project. A project without path is "virtual". Its slug is `input.slug` or slugify(name) (omitted when empty). */
 export function addProject(registryDir: string, input: AddProjectInput, options: MutationOptions = {}): Promise<Project> {
   return updateRegistry(
     registryDir,
     (registry) => {
       const name = normalizeLabel(input.name, 'name');
+      if (input.slug !== undefined) {
+        validateSlug(input.slug);
+      }
+      const slug = input.slug ?? slugify(name);
       const aliases = (input.aliases ?? []).map((alias) => normalizeLabel(alias, 'alias'));
       assertLabelsFree(registry, [{ label: name, kind: 'name' }, ...aliases.map((label) => ({ label, kind: 'alias' as const }))]);
       const parent = input.parent === undefined ? undefined : resolveReference(registry, input.parent);
@@ -43,6 +50,7 @@ export function addProject(registryDir: string, input: AddProjectInput, options:
       const project: Project = {
         id,
         name,
+        ...(slug === '' ? {} : { slug }),
         aliases,
         ...(parent === undefined ? {} : { parent: parent.id }),
         paths: path === undefined ? [] : [{ path, main: true }],

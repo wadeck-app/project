@@ -48,7 +48,7 @@ function projectProblem(value: unknown, withDeletedAt: boolean): string | undefi
   if (value['labels'] !== undefined && !isStringArray(value['labels'])) {
     return "has a 'labels' that is not an array of strings";
   }
-  for (const key of ['parent', 'git'] as const) {
+  for (const key of ['parent', 'git', 'slug'] as const) {
     if (value[key] !== undefined && typeof value[key] !== 'string') {
       return `has a non-string '${key}'`;
     }

@@ -124,8 +124,8 @@ export function realLogMentions(token: string): boolean {
 }
 
 // Lines that npm and node print on their own, whatever the code under test does: `npm warn ...` (setup-node writes an npmrc with keys
-// the installed npm does not know, "Unknown user config"), deprecation / experimental warnings of node and the debugger.
-const NOISE = [/^npm warn(\s|$)/, /^\(node:\d+\) /, /^\(Use `node --trace-/, /^Debugger attached/, /^Waiting for the debugger/, /^Debugger listening/];
+// the installed npm does not know, "Unknown user config"), `npm notice ...` ("New major version of npm available"), deprecation / experimental warnings of node and the debugger.
+const NOISE = [/^npm warn(\s|$)/, /^npm notice(\s|$)/,/^\(node:\d+\) /, /^\(Use `node --trace-/, /^Debugger attached/, /^Waiting for the debugger/, /^Debugger listening/];
 
 /** The stderr of a child process without the noise of npm and node: real errors and the output of the code under test are kept as they are. */
 export function significantStderr(text: string): string {

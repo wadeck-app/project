@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { addProject, loadDeleted, loadRegistry, removeProject, toNativePath } from '@wadeck-app/project-sdk';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -178,6 +178,84 @@ describe('changes of one project', () => {
     expect(find('shop')?.git).toBe('git@x:shop.git');
     expect((await module.call('DELETE', '/projects/shop/git')).body.message).toBe('Cleared the git url of shop.');
     expect(find('shop')?.git).toBeUndefined();
+  });
+});
+
+describe('PUT /projects/:ref/slug', () => {
+  const projectsDir = (): string => join(world.registryDir, 'projects');
+
+  it('moves the folder with its data, updates the registry and answers with the old and new folder', async () => {
+    const shop = await addProject(world.registryDir, { name: 'shop' });
+    const old = join(projectsDir(), `${shop.id}-shop`);
+    mkdirSync(join(old, 'task', 'data'), { recursive: true });
+    writeFileSync(join(old, 'task', 'data', 'f.txt'), 'payload');
+    const { status, body } = await makeModule().call('PUT', '/projects/shop/slug', { body: { slug: 'storefront' } });
+    expect(status).toBe(200);
+    expect(body.message).toContain("changed to 'storefront'");
+    expect(body.message).toContain('the folder was moved');
+    expect(find('shop')?.slug).toBe('storefront');
+    expect(existsSync(old)).toBe(false);
+    expect(readFileSync(join(projectsDir(), `${shop.id}-storefront`, 'task', 'data', 'f.txt'), 'utf8')).toBe('payload');
+    const detail = await makeModule().call('GET', '/projects/shop');
+    expect(detail.body.project).toMatchObject({ slug: 'storefront', slugLine: 'Folder name (slug): storefront' });
+    expect(detail.body.project.folder).toBe(`${world.registryDir.replace(/\\/g, '/')}/projects/${shop.id}-storefront`);
+    expect(detail.body.forms.slug).toEqual({ ref: shop.id, slug: 'storefront' });
+  });
+
+  it('says nothing changed for the same slug', async () => {
+    await addProject(world.registryDir, { name: 'shop' });
+    const { status, body } = await makeModule().call('PUT', '/projects/shop/slug', { body: { slug: 'shop' } });
+    expect(status).toBe(200);
+    expect(body.message).toContain('nothing changed');
+  });
+
+  it('refuses an invalid slug (400) with the rule', async () => {
+    await addProject(world.registryDir, { name: 'shop' });
+    const { status, body } = await makeModule().call('PUT', '/projects/shop/slug', { body: { slug: 'Bad Slug' } });
+    expect(status).toBe(400);
+    expect(body.error).toBe('INVALID_SLUG');
+    expect(body.message).toContain('kebab-case');
+    expect(find('shop')?.slug).toBe('shop');
+  });
+
+  it('refuses an unknown project (404) and a project of the trash (404)', async () => {
+    const gone = await addProject(world.registryDir, { name: 'gone' });
+    await removeProject(world.registryDir, 'gone');
+    expect((await makeModule().call('PUT', '/projects/nope/slug', { body: { slug: 'x' } })).status).toBe(404);
+    expect((await makeModule().call('PUT', `/projects/${gone.id}/slug`, { body: { slug: 'x' } })).status).toBe(404);
+  });
+
+  it('refuses (409) when two folders hold the project, changing nothing', async () => {
+    const shop = await addProject(world.registryDir, { name: 'shop' });
+    mkdirSync(join(projectsDir(), shop.id), { recursive: true });
+    mkdirSync(join(projectsDir(), `${shop.id}-shop`), { recursive: true });
+    const { status, body } = await makeModule().call('PUT', '/projects/shop/slug', { body: { slug: 'other' } });
+    expect(status).toBe(409);
+    expect(body.error).toBe('PROJECT_DIR_AMBIGUOUS');
+    expect(body.message).toContain('merge them by hand');
+    expect(find('shop')?.slug).toBe('shop');
+    // the detail page still opens and says why the folder is unknown
+    const detail = await makeModule().call('GET', '/projects/shop');
+    expect(detail.status).toBe(200);
+    expect(detail.body.project.warnings.join(' ')).toContain('merge them by hand');
+  });
+
+  it('is logged in the daily log', async () => {
+    await addProject(world.registryDir, { name: 'shop' });
+    await makeModule().call('PUT', '/projects/shop/slug', { body: { slug: 'front' } });
+    const day = new Date().toISOString().slice(0, 10);
+    expect(readFileSync(join(world.registryDir, 'logs', `${day}.ndjson`), 'utf8')).toContain("changed the folder name from 'shop' to 'front'");
+  });
+
+  it.each([
+    [{}, "the field 'slug' is required"],
+    [{ slug: 3 }, "the field 'slug' must be text"],
+    [{ slug: 'x', extra: 1 }, "unknown field 'extra'"],
+  ])('validates the body %j', async (body, message) => {
+    await addProject(world.registryDir, { name: 'shop' });
+    const result = await makeModule().call('PUT', '/projects/shop/slug', { body });
+    expect(result.status).toBe(400);
+    expect(result.body.message).toContain(message);
   });
 });
 

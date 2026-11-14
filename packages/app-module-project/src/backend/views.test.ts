@@ -254,6 +254,17 @@ describe('dsl-views', () => {
     }
   });
 
+  it('every layout variant has the folder name (slug) form, and its action warns that the folder is moved and the tools must be stopped', () => {
+    const { variants } = abVariants();
+    for (const [id, variant] of Object.entries(variants)) {
+      const forms = findForms(variant.view).filter((f) => f['onSubmit'] === '$ctx.setSlug');
+      expect(forms, id).toHaveLength(1);
+    }
+    const action = (parseView('project-page.yaml') as { $actions: Record<string, { url: string; confirm?: string }> }).$actions['setSlug']!;
+    expect(action.url).toBe('PUT /api/modules/project/projects/{ref}/slug');
+    expect(action.confirm).toMatch(/MOVED.*Stop the tools/s);
+  });
+
   // A provider's moreUrl must be a visible link, not only the click on the row: a column with the text "See all" whose address is the row href.
   it('the Related table shows a "See all" link per panel (empty text, so no link, when the provider sent no moreUrl)', () => {
     const page = readFileSync(join(viewsDir, 'project-page.yaml'), 'utf8');

@@ -7,6 +7,7 @@ import type { Project, Registry } from './types.js';
 import { describeProject } from './projects.js';
 import { validateProjectLabels } from './projectLabels.js';
 import { realPathKey } from './realPath.js';
+import { validateSlug } from './slug.js';
 
 export interface ValidateOptions {
   /** default false. true: every registered path must exist as a directory; an array: only the paths with these keys (see pathKey). */
@@ -38,6 +39,13 @@ function checkIdentity(project: Project): void {
   checkLabel(project, 'name', project.name);
   project.aliases.forEach((alias) => checkLabel(project, 'alias', alias));
   validateProjectLabels(project);
+  if (project.slug !== undefined) {
+    try {
+      validateSlug(project.slug);
+    } catch (error) {
+      throw new RegistryInvalidError(`${describe(project)}: ${(error as Error).message}; set a valid one with the project slug command`);
+    }
+  }
 }
 
 function checkLabelsUnique(projects: Project[]): void {

@@ -190,6 +190,8 @@ export interface Detail {
   aliasesLine: string;
   labelsLine: string;
   gitLine: string;
+  slug?: string;
+  slugLine: string;
   virtual: boolean;
   virtualText: string;
   parent: ProjectRef | null;
@@ -202,7 +204,7 @@ export interface Detail {
   descendants: ProjectRow[];
   hasPaths: boolean;
   paths: { path: string; pathText: string; main: boolean; mainText: string }[];
-  /** The folder of the project in the registry, stored form, then in the form of the platform. */
+  /** The folder of the project in the registry (`<id>-<slug>`, or the legacy `<id>`), stored form, then in the form of the platform. Empty when two folders hold the project (a warning says so). */
   folder: string;
   folderText: string;
   toolFoldersText: string;
@@ -228,7 +230,18 @@ export function detailOf(registryDir: string, registry: Registry, project: Proje
   const parent = project.parent === undefined ? undefined : registry.projects.find((p) => p.id === project.parent);
   const descendants = getDescendants(registry, project);
   const labels = project.labels ?? [];
-  const folder = normalizePath(projectDir(registryDir, project.id));
+  // Two folders for one project is a state the user must fix by hand: the page still opens (it is where the slug is shown) and says so.
+  let folder = '';
+  let folderProblem: string | undefined;
+  try {
+    folder = normalizePath(projectDir(registryDir, project.id));
+  } catch (error) {
+    if (!(error instanceof ProjectError)) {
+      throw error;
+    }
+    folderProblem = error.message;
+    warnings.push(error.message);
+  }
   return {
     id: project.id,
     name: project.name,
@@ -245,6 +258,8 @@ export function detailOf(registryDir: string, registry: Registry, project: Proje
     aliasesLine: `Aliases: ${textOf(project.aliases, 'none')}`,
     labelsLine: `Labels: ${textOf(labels, 'none')}`,
     gitLine: `Git: ${project.git ?? 'none'}`,
+    ...(project.slug === undefined ? {} : { slug: project.slug }),
+    slugLine: `Folder name (slug): ${project.slug ?? 'none'}`,
     virtual: isVirtual(project),
     virtualText: isVirtual(project) ? 'virtual' : '',
     parent: parent === undefined ? null : refOf(parent),
@@ -258,8 +273,8 @@ export function detailOf(registryDir: string, registry: Registry, project: Proje
     hasPaths: project.paths.length > 0,
     paths: project.paths.map((entry) => ({ path: entry.path, pathText: toNativePath(entry.path), main: entry.main, mainText: entry.main ? 'main' : '' })),
     folder,
-    folderText: toNativePath(folder),
-    toolFoldersText: `${toNativePath(folder)} (one folder per tool, each with config, data, cache and logs)`,
+    folderText: folderProblem === undefined ? toNativePath(folder) : 'unknown (see the warning)',
+    toolFoldersText: folderProblem === undefined ? `${toNativePath(folder)} (one folder per tool, each with config, data, cache and logs)` : 'unknown (see the warning)',
     warnings,
     warningsText: warnings.join(' '),
   };

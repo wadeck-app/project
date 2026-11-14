@@ -28,6 +28,8 @@ export { REGISTRY_SCHEMA_VERSION, deletedFilePath, loadDeleted, loadRegistry, re
 export { type ValidateOptions, validateRegistry } from './validate.js';
 export type { MutationOptions } from './update.js';
 export { type AddProjectInput, addAlias, addProject, removeAlias, renameProject, setGit, setParent } from './projectMutations.js';
+export { type RenameSlugOptions, type RenameSlugResult, renameSlug } from './projectSlug.js';
+export { MAX_SLUG_LENGTH, slugify, validateSlug } from './slug.js';
 export { addPath, movePath, removePath, setMain } from './pathMutations.js';
 export { removeProject } from './removal.js';
 export { restoreProject } from './restore.js';

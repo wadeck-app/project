@@ -24,6 +24,63 @@ describe('mutating commands', () => {
     return found;
   }
 
+  describe('slug', () => {
+    function folderOf(ref: string): string {
+      return join(h.registryDir, 'projects', `${project(ref).id}-${project(ref).slug}`);
+    }
+
+    it('moves the folder, prints the old and new folder, logs the mutation and keeps the data', async () => {
+      const id = project('shop').id;
+      const before = folderOf('shop');
+      mkdirSync(join(before, 'task', 'data'), { recursive: true });
+      const result = await h.cli(['slug', 'shop', 'storefront']);
+      expect(result.code).toBe(0);
+      expect(result.out.split('\n')).toEqual([
+        `slug of shop (${id}): shop -> storefront`,
+        `  folder moved: ${native(before.replace(/\\/g, '/'))} -> ${native(join(h.registryDir, 'projects', `${id}-storefront`).replace(/\\/g, '/'))}`,
+      ]);
+      expect(existsSync(before)).toBe(false);
+      expect(existsSync(join(h.registryDir, 'projects', `${id}-storefront`, 'task', 'data'))).toBe(true);
+      expect(project('shop').slug).toBe('storefront');
+      expect((await h.cli(['path', 'shop'])).out).toBe(join(h.registryDir, 'projects', `${id}-storefront`).replace(/\\/g, '/'));
+    });
+
+    it('acts on the project of the cwd when only the slug is given, and does not rename the project', async () => {
+      const result = await h.cli(['slug', 'front'], { cwd: shop });
+      expect(result.code).toBe(0);
+      expect(project('shop').slug).toBe('front');
+    });
+
+    it('prints the project, the folders and the flags as JSON', async () => {
+      const result = await h.cli(['slug', 'shop', 'front', '--json']);
+      expect(JSON.parse(result.out)).toMatchObject({ name: 'shop', slug: 'front', moved: false, unchanged: false });
+    });
+
+    it('says nothing changed for the same slug', async () => {
+      const result = await h.cli(['slug', 'shop', 'shop']);
+      expect(result.code).toBe(0);
+      expect(result.out).toContain('is already shop, nothing changed');
+    });
+
+    it('exits 1 with the rule when the slug is invalid, 2 when it is missing', async () => {
+      const bad = await h.cli(['slug', 'shop', 'Bad Slug']);
+      expect(bad.code).toBe(1);
+      expect(bad.err).toMatch(/not a valid slug.*shop-front/s);
+      const missing = await h.cli(['slug']);
+      expect(missing.code).toBe(2);
+      expect(missing.err).toContain('expected [<ref>] <slug>');
+    });
+
+    it('exits 1 and tells to merge by hand when two folders hold the project', async () => {
+      const id = project('shop').id;
+      mkdirSync(join(h.registryDir, 'projects', id), { recursive: true });
+      mkdirSync(join(h.registryDir, 'projects', `${id}-shop`), { recursive: true });
+      const result = await h.cli(['slug', 'shop', 'front']);
+      expect(result.code).toBe(1);
+      expect(result.err).toContain('merge them by hand, keep one');
+    });
+  });
+
   describe('rename', () => {
     it('renames the project, keeping its id, and logs the resolution first', async () => {
       const id = project('shop').id;

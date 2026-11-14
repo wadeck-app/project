@@ -28,6 +28,7 @@ describe('route list', () => {
         'DELETE /projects/:ref',
         'GET /projects/:ref/related',
         'PUT /projects/:ref/name',
+        'PUT /projects/:ref/slug',
         'POST /projects/:ref/aliases',
         'DELETE /projects/:ref/aliases',
         'POST /projects/:ref/labels',

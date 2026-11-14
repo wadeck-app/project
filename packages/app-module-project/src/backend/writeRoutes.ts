@@ -7,11 +7,13 @@ import {
   defaultRegistryDir,
   loadRegistry,
   movePath,
+  normalizePath,
   removeAlias,
   removeLabels,
   removePath,
   removeProject,
   renameProject,
+  renameSlug,
   restoreProject,
   setGit,
   setMain,
@@ -65,6 +67,20 @@ export function registerWriteRoutes(kit: RouteKit): void {
     const updated = await renameProject(defaultRegistryDir(process.env), old.id, name);
     remembered(`renamed from '${old.name}'`, updated);
     return changed(`Renamed '${old.name}' to '${updated.name}'.`, updated);
+  });
+
+  kit.route('PUT', '/projects/:ref/slug', async (req) => {
+    const { slug } = parseBody(req.body, { ref: 'ignored?', slug: 'string' });
+    const old = before(req);
+    const result = await renameSlug(defaultRegistryDir(process.env), old.id, slug);
+    const { project: updated } = result;
+    remembered(`changed the folder name from '${old.slug ?? 'none'}' to '${slug}'`, updated);
+    const message = result.unchanged
+      ? `The folder name of ${updated.name} is already '${slug}', nothing changed.`
+      : result.moved
+        ? `Folder name of ${updated.name} changed to '${slug}': the folder was moved from ${toNativePath(normalizePath(result.from))} to ${toNativePath(normalizePath(result.to))}.`
+        : `Folder name of ${updated.name} changed to '${slug}' (the folder does not exist yet, nothing was moved).`;
+    return changed(message, updated);
   });
 
   kit.route('POST', '/projects/:ref/aliases', async (req) => {

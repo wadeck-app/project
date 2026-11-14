@@ -181,6 +181,13 @@ describe('detailOf', () => {
     expect(detailOf(registryDir, registry, grand)).toMatchObject({ aliasesLine: 'Aliases: none', labelsLine: 'Labels: none', gitLine: 'Git: none' });
   });
 
+  it('shows the slug as a labelled line, and none for a project without one', () => {
+    expect(detailOf(registryDir, registry, project(9, { name: 'x', slug: 'ex' }))).toMatchObject({ slug: 'ex', slugLine: 'Folder name (slug): ex' });
+    const none = detailOf(registryDir, registry, grand);
+    expect(none.slugLine).toBe('Folder name (slug): none');
+    expect('slug' in none).toBe(false);
+  });
+
   it('says where the tool folders are, from the id', () => {
     const detail = detailOf(registryDir, registry, shop);
     expect(detail.folder).toBe(`${registryDir}/projects/${shop.id}`);

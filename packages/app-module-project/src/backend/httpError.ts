@@ -8,18 +8,22 @@ import {
   InvalidPathError,
   InvalidProjectLabelError,
   InvalidQualifiedIdError,
+  InvalidSlugError,
   InvalidToolError,
   LabelTakenError,
   LockTimeoutError,
   MainPathError,
   ParentCycleError,
   PathOwnedError,
+  ProjectDirAmbiguousError,
   ProjectError,
+  ProjectFolderInUseError,
   ProjectLabelNotFoundError,
   ProjectNotFoundError,
   ProjectOptionError,
   RegistryInvalidError,
   RestoreConflictError,
+  SlugFolderExistsError,
   VirtualProjectError,
 } from '@wadeck-app/project-sdk';
 
@@ -43,7 +47,7 @@ export interface HttpErrorResult {
 }
 
 const NOT_FOUND = [ProjectNotFoundError, ProjectLabelNotFoundError];
-const INVALID = [InvalidLabelError, InvalidProjectLabelError, InvalidLabelSelectorError, InvalidPathError, InvalidIdError, InvalidQualifiedIdError, InvalidToolError, ProjectOptionError];
+const INVALID = [InvalidLabelError, InvalidProjectLabelError, InvalidLabelSelectorError, InvalidPathError, InvalidIdError, InvalidQualifiedIdError, InvalidSlugError, InvalidToolError, ProjectOptionError];
 const CONFLICT = [
   LabelTakenError,
   PathOwnedError,
@@ -54,6 +58,9 @@ const CONFLICT = [
   ParentCycleError,
   DanglingParentError,
   VirtualProjectError,
+  ProjectDirAmbiguousError,
+  SlugFolderExistsError,
+  ProjectFolderInUseError,
 ];
 
 function statusOf(error: ProjectError): number {

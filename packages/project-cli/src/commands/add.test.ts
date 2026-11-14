@@ -3,6 +3,20 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type Harness, makeHarness, native } from '../testHelpers.js';
 
 describe('project add', () => {
+  it('stores the slug derived from the name, or the one given with --slug, and refuses an invalid one', async () => {
+    const h2 = makeHarness();
+    try {
+      await h2.cli(['add', h2.dir('Shop.Front')]);
+      await h2.cli(['add', h2.dir('other'), '--slug', 'oth']);
+      const bad = await h2.cli(['add', h2.dir('third'), '--slug', 'Bad Slug']);
+      expect(loadRegistry(h2.registryDir).projects.map((p) => p.slug)).toEqual(['shop-front', 'oth']);
+      expect(bad.code).toBe(1);
+      expect(bad.err).toContain('not a valid slug');
+    } finally {
+      h2.cleanup();
+    }
+  });
+
   let h: Harness;
 
   beforeEach(() => {

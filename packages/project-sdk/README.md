@@ -11,10 +11,33 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
   registry.json            { schemaVersion: 1, projects: Project[] }
   deleted_projects.json    { schemaVersion: 1, projects: (Project & { deletedAt })[] }
   registry.lock            write lock (pid, token, host, createdAt); stale after 30 s without touch
-  projects/<id>/<tool>/{config,data}/
+  projects/<id>-<slug>/<tool>/{config,data,cache,logs}/
 ```
 
-`Project = { id, name, aliases, parent?, paths: { path, main }[], git?, labels?, createdAt }`. Paths are stored normalized (absolute, forward slashes, uppercase drive letter on Windows).
+`Project = { id, name, slug?, aliases, parent?, paths: { path, main }[], git?, labels?, createdAt }`. Paths are stored normalized (absolute, forward slashes, uppercase drive letter on Windows).
+
+## Project folder and slug
+
+- `slug`: kebab-case ASCII, 1 to 20 chars (`^[a-z0-9]+(-[a-z0-9]+)*# @wadeck-app/project-sdk
+
+Zero-dependency SDK for the shared "project" concept of the task, flow and queue CLIs: registry, reference resolution, per-project config/data folders. ESM + CJS, node >= 22. No console output, no `process.exit`: plain functions, plain data, errors thrown.
+
+Every I/O function takes an explicit `registryDir` (no hidden global). `defaultRegistryDir(env, home?)` gives `$XDG_CONFIG_HOME/project`, else `<home>/.config/project` (`home` defaults to `os.homedir()`; pass it in tests).
+
+## Registry layout
+
+```
+<registryDir>/
+  registry.json            { schemaVersion: 1, projects: Project[] }
+  deleted_projects.json    { schemaVersion: 1, projects: (Project & { deletedAt })[] }
+  registry.lock            write lock (pid, token, host, createdAt); stale after 30 s without touch
+  projects/<id>-<slug>/<tool>/{config,data,cache,logs}/
+```
+
+`Project = { id, name, slug?, aliases, parent?, paths: { path, main }[], git?, labels?, createdAt }`. , `validateSlug`, error `InvalidSlugError`). `addProject` stores `slugify(name)` (or `slug` when given); a registry without slugs stays valid.
+- `projectDir(registryDir, id)` reads the disk: the one entry of `projects/` equal to `<id>` (legacy layout) or starting with `<id>-`. None: the path to create, `<id>-<slug>` (slug of registry.json, else `slugify(name)`), `<id>` alone when that is empty or the id is not in the registry. Two or more: `ProjectDirAmbiguousError` naming both, merge by hand (a link named `<id>` counts as a second entry). `projectToolDir` and `getConfigLayers` go through it, so they read the disk too (`getConfigLayers` takes the slugs from the registry it is given).
+- `renameSlug(registryDir, ref, slug, { lock? })` moves the folder to `<id>-<slug>` under the registry lock and returns `{ project, from, to, moved, unchanged }`. Same slug with a folder already named so: no-op. Folder missing: registry only. OS refusal of the move (`EBUSY`, `EPERM`, `EACCES`, `ENOTEMPTY`, a daemon of task, queue or flow holds files there): `ProjectFolderInUseError`, nothing changed. Registry write failing after the move: folder moved back, `SlugRenameFailedError`. Renaming the project (`renameProject`) never moves the folder; folders of removed projects are not moved.
+- A tool built with an SDK older than this layout keeps using `projects/<id>`: stop it and update it before renaming a folder.
 
 ## Rules
 
@@ -24,22 +47,22 @@ Every I/O function takes an explicit `registryDir` (no hidden global). `defaultR
 - Paths are stored with forward slashes; error messages, the NoProjectInScopeError hint included, show them in the native form (`toNativePath`: backslashes on Windows), while the data of the errors (`cwd`, `path`) stays as stored.
 - Paths stay purely string-based (`normalizePath`, `pathKey`), but matching also compares real folders (`fs.realpathSync.native`): a cwd reached through a junction, symlink or 8.3 short name resolves, and registering a link to a folder another project owns is refused. A registered path that no longer exists is matched by its normalized path only.
 - Reads (`loadRegistry`) take no lock and skip full validation. A missing `registry.json` (or `deleted_projects.json`) is the first-use state: an empty registry, nothing is created. Every mutation: lock, load, change, `validateRegistry`, atomic write.
-- `removeProject` is a soft delete; `projects/<id>/` is never deleted. `restoreProject` brings a project back (see Restore).
+- `removeProject` is a soft delete; the project folder is never deleted. `restoreProject` brings a project back (see Restore).
 
 ## API
 
 | Area | Functions |
 |---|---|
-| Location | `defaultRegistryDir(env, home?)`, `projectDir(registryDir, id)` |
+| Location | `defaultRegistryDir(env, home?)`, `projectDir(registryDir, id)` (reads the disk, see Project folder and slug) |
 | Read | `REGISTRY_SCHEMA_VERSION`, `loadRegistry`, `loadDeleted`, `validateRegistry(registry, options?)` (`checkPaths` defaults to false), `registryFilePath`, `deletedFilePath` |
 | Labels | `addLabels(registryDir, ref, labels)`, `removeLabels(registryDir, ref, labels)`, `parseLabel`, `formatLabel`, `normalizeProjectLabel`, `labelsOf(project)`, `hasLabel(project, selector)`, `matchesSelectors(project, selectors)`, `filterProjects(registry, selectors)` |
-| Projects | `addProject` (`labels?`), `renameProject`, `addAlias`, `removeAlias`, `setParent`, `setGit`, `removeProject(registryDir, ref, { recursive })` |
+| Projects | `addProject` (`labels?`, `slug?`), `renameProject`, `renameSlug`, `slugify`, `validateSlug`, `addAlias`, `removeAlias`, `setParent`, `setGit`, `removeProject(registryDir, ref, { recursive })` |
 | Paths | `addPath(.., { main })`, `removePath(.., { newMain })`, `movePath`, `setMain` |
 | Options | `extractProjectOption(argv, env, envName)`, `resolveProjectFromArgs(registry, argv, env, envName, cwd)` |
 | Lookup | `findProjectIncludingDeleted(registryDir, id)`, `restoreProject(registryDir, ref, { recursive? })` |
 | Ids and origin | `formatQualifiedId`, `parseQualifiedId`, `resolveQualifiedId(registry, input, fallback?)`, `buildOrigin(tool, scope?, now?)`, `formatOrigin` |
 | Resolution | `resolveReference`, `findProjectForPath`, `resolveScope` (flag > env > cwd; `label` names the source of an explicit reference), `describeResolution`, `requirePath` |
-| Inheritance | `getChain`, `getAncestors` (parent first), `getChildren`, `getDescendants` (breadth-first, cycle-safe; the project itself is never included), `getConfigLayers`, `projectToolDir(registryDir, id, tool, kind, { ensure })` with kind `config`, `data`, `cache` or `logs` (`<registryDir>/projects/<id>/<tool>/<kind>`) |
+| Inheritance | `getChain`, `getAncestors` (parent first), `getChildren`, `getDescendants` (breadth-first, cycle-safe; the project itself is never included), `getConfigLayers`, `projectToolDir(registryDir, id, tool, kind, { ensure })` with kind `config`, `data`, `cache` or `logs` (`<projectDir>/<tool>/<kind>`) |
 | Config helpers | `validateLayer`, `mergeLayers(schema, layers)`, root-first with the project's own layer last; `ConfigSchema` scopes `global`, `local`, `inherit`; merges `replace`, `deep`, `append`; the CLIs parse the files |
 | Related items | `parseRelatedResponse(input)`, `buildRelatedResponse(panel)`, `assertRelatedResponse(input)`, `isModuleUrl(url)`, types `RelatedPanel`, `RelatedItem`, error `InvalidRelatedResponseError` |
 | Infra | `withRegistryLock`, `writeFileAtomic`, `lockFilePath` |
@@ -79,6 +102,11 @@ All extend `ProjectError` (`code`, actionable message). Messages name no API opt
 | `DanglingParentError` | `DANGLING_PARENT` |
 | `ParentCycleError` | `PARENT_CYCLE` |
 | `ConfigSchemaError` | `CONFIG_SCHEMA` |
+| `InvalidSlugError` | `INVALID_SLUG` (`slug`) |
+| `ProjectDirAmbiguousError` | `PROJECT_DIR_AMBIGUOUS` (`projectId`, `folders`) |
+| `SlugFolderExistsError` | `SLUG_FOLDER_EXISTS` (`folder`) |
+| `ProjectFolderInUseError` | `PROJECT_FOLDER_IN_USE` (`from`, `to`, `osCode`) |
+| `SlugRenameFailedError` | `SLUG_RENAME_FAILED` (`from`, `to`, `restored`) |
 
 ## Restore
 

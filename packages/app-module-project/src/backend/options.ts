@@ -38,6 +38,7 @@ export interface DetailForms {
   /** Only the id of the project: the forms whose fields are all chosen by the user. */
   empty: { ref: string };
   rename: { ref: string; name: string };
+  slug: { ref: string; slug: string };
   git: { ref: string; git: string };
   parent: { ref: string; parent: string };
 }
@@ -47,6 +48,7 @@ export function detailForms(project: Project): DetailForms {
   return {
     empty: { ref: project.id },
     rename: { ref: project.id, name: project.name },
+    slug: { ref: project.id, slug: project.slug ?? '' },
     git: { ref: project.id, git: project.git ?? '' },
     parent: { ref: project.id, parent: project.parent ?? '' },
   };
