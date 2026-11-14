@@ -113,9 +113,14 @@ function report(error: unknown, io: Io): Failure {
     }
     return { exitCode: EXIT_ERROR, code: error.code };
   }
+  return { exitCode: reportUnexpected(error, io), code: 'UNEXPECTED' };
+}
+
+/** Prints an exception nobody planned for, with how to report it, and returns the exit code 70. Also used by main.ts for what happens around run(). */
+export function reportUnexpected(error: unknown, io: Io): number {
   io.err('unexpected error (this is a bug of the project CLI, please report it with the output below):');
   io.err(error instanceof Error ? (error.stack ?? String(error)) : String(error));
-  return { exitCode: EXIT_UNEXPECTED, code: 'UNEXPECTED' };
+  return EXIT_UNEXPECTED;
 }
 
 /**

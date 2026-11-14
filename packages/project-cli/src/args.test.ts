@@ -40,6 +40,11 @@ describe('parseArgs', () => {
     expect(parsed.positionals).toEqual(['--name', '-p']);
   });
 
+  it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])('treats --%s as an unknown option, not an inherited member of the specs', (name) => {
+    expect(() => parseArgs([`--${name}`], specs, 'project add')).toThrow(new RegExp(`unknown option '--${name}' for 'project add'`));
+    expect(() => parseArgs([`--${name}=1`], specs, 'project add')).toThrow(UsageError);
+  });
+
   it('rejects an unknown option and names the command', () => {
     expect(() => parseArgs(['--nope'], specs, 'project add')).toThrow(UsageError);
     expect(() => parseArgs(['--nope'], specs, 'project add')).toThrow(/unknown option '--nope' for 'project add'/);

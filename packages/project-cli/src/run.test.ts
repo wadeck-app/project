@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { run } from './run.js';
+import { reportUnexpected, run } from './run.js';
 import { type Harness, makeHarness } from './testHelpers.js';
 
 const version = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version;
@@ -16,6 +16,17 @@ describe('run', () => {
   it('prints the version from package.json', async () => {
     const result = await h.cli(['--version']);
     expect(result).toEqual({ code: 0, out: version, err: '' });
+  });
+
+  it('reportUnexpected explains how to report the bug, prints the stack and returns 70', () => {
+    const lines: string[] = [];
+    const code = reportUnexpected(new Error('boom'), { out: () => undefined, err: (line) => lines.push(line) });
+    expect(code).toBe(70);
+    expect(lines[0]).toContain('please report it');
+    expect(lines[1]).toContain('boom');
+    const plain: string[] = [];
+    expect(reportUnexpected('not an error', { out: () => undefined, err: (line) => plain.push(line) })).toBe(70);
+    expect(plain[1]).toBe('not an error');
   });
 
   it('accepts -v as a short --version', async () => {

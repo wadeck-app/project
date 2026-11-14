@@ -19,7 +19,7 @@
 #   REGISTRY        npm registry URL (default: https://npm.pkg.github.com/).
 #   PKG_SCOPE       npm scope without leading '@' (default: wadeck-app).
 #   PLATFORMS       Comma list of platforms to generate and support, among win32-x64, darwin-arm64, darwin-x64, linux-x64
-#                   (default: all three). The same list is baked into the shim as {{PLATFORMS}}: any other host
+#                   (default: win32-x64,darwin-arm64,darwin-x64, NOT linux-x64). The same list is baked into the shim as {{PLATFORMS}}: any other host
 #                   is refused by the shim with "unsupported platform". Set it explicitly in every consumer.
 #   PKG_VERSION     Exact version of the build (the one `npm pkg set version` will stamp). The dist package pins each
 #                   platform package to it. Without it the range is "latest" (the user rule for internal libs: it matches

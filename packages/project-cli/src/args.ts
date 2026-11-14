@@ -50,7 +50,8 @@ function lookup(arg: string, specs: OptionSpecs, label: string): Token {
   if (arg.startsWith('--')) {
     const eq = arg.indexOf('=');
     const name = eq === -1 ? arg.slice(2) : arg.slice(2, eq);
-    const spec = specs[name];
+    // Own properties only: `--constructor` or `--toString` must be an unknown option, not an inherited member of the specs object
+    const spec = Object.hasOwn(specs, name) ? specs[name] : undefined;
     if (spec === undefined) {
       throw unknown();
     }

@@ -3,7 +3,7 @@ import { defaultRegistryDir } from '@wadeck-app/project-sdk';
 import { UpdateManager } from '@wadeck-app/shared-cli';
 import { showUpdateNotice } from './noticeGlue.js';
 import { PACKAGE_NAME, UPDATER_BUNDLE_NAME, ownBundlePath } from './ownBundle.js';
-import { run } from './run.js';
+import { reportUnexpected, run } from './run.js';
 import { currentVersion } from './version.js';
 
 async function main(): Promise<void> {
@@ -31,4 +31,10 @@ async function main(): Promise<void> {
   updates.scheduleBackgroundUpdate(ownBundlePath(), UPDATER_BUNDLE_NAME, currentVersion());
 }
 
-void main();
+// A throw outside run() (update notice, version, background update) must end like any unexpected error: message and exit 70, not a raw rejection.
+main().catch((error: unknown) => {
+  process.exitCode = reportUnexpected(error, {
+    out: (line) => process.stdout.write(`${line}\n`),
+    err: (line) => process.stderr.write(`${line}\n`),
+  });
+});
