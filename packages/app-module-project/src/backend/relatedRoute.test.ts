@@ -77,6 +77,30 @@ describe('GET /projects/:ref/related', () => {
     expect(body.warnings[0]).toEqual({ module: 'bad', text: expect.stringMatching(/^bad: .*status 500/) });
   });
 
+  it('gives one entry per tool tab (task, queue, flow): the items of the module that answered, the reason for the others', async () => {
+    await addProject(world.registryDir, { name: 'shop' });
+    const app = await fakeAppCore(['task', 'queue'], { task: (_req, res) => json(res, 200, panel('Tasks')), queue: (_req, res) => json(res, 500, {}) });
+    process.env['APP_CORE_PORT'] = new URL(app.baseUrl).port;
+    const { body } = await makeModule().call('GET', '/projects/shop/related');
+    expect(Object.keys(body.tabs).sort()).toEqual(['flow', 'queue', 'task']);
+    expect(body.tabs.task).toEqual({
+      emptyText: '',
+      title: 'Tasks',
+      countText: '2 recent items',
+      noteText: '',
+      seeAllText: 'See all',
+      href: '/modules/task/tasks?project=shop',
+      rows: [
+        { label: 'Fix it', subtitle: 'open', href: '/modules/task/tasks/a' },
+        { label: 'Other', subtitle: '', href: '/modules/task/tasks/b' },
+      ],
+    });
+    // A module that failed says so (with its reason); one that was never asked (not installed) says it has nothing. Neither has a title, so the page shows only the text.
+    expect(body.tabs.queue.emptyText).toMatch(/^The queue module did not answer: .*status 500/);
+    expect(body.tabs.queue.title).toBeUndefined();
+    expect(body.tabs.flow).toEqual({ emptyText: expect.stringContaining('The flow module has nothing to show'), rows: [] });
+  });
+
   it('says there is nothing related when no module contributes', async () => {
     await addProject(world.registryDir, { name: 'shop' });
     const app = await fakeAppCore(['project', 'plain'], {});

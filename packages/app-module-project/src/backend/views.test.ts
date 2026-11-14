@@ -195,7 +195,18 @@ describe('dsl-views', () => {
     const page = readFileSync(join(viewsDir, 'project-page.yaml'), 'utf8');
     expect(page).toContain("key: 'countText'");
     expect(page).not.toMatch(/key: 'count'/);
-    expect(page).not.toContain('.count');
+    // `.countText` is the allowed field; the raw `.count` (alone) is not
+    expect(page).not.toMatch(/\.count(?![A-Za-z])/);
+  });
+
+  it('the detail page is organised in tabs kept in the URL: overview, one per tool, settings last', () => {
+    const page = parseView('project-page.yaml') as { sections: { $type: string; urlParam?: string; tabs?: { id: string; label: string; children: unknown[] }[] }[] };
+    const tabs = page.sections.find((s) => s.$type === 'PageTabs');
+    expect(tabs?.urlParam).toBe('tab');
+    expect(tabs?.tabs?.map((t) => t.id)).toEqual(['overview', 'task', 'flow', 'queue', 'settings']);
+    for (const tab of tabs?.tabs ?? []) {
+      expect(tab.children.length, tab.id).toBeGreaterThan(0);
+    }
   });
 
   // A provider's moreUrl must be a visible link, not only the click on the row: a column with the text "See all" whose address is the row href.

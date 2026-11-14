@@ -56,6 +56,10 @@ A client that is not a browser sends no `Origin` and passes if it sends the othe
 
 ## Slots
 
+### Layout of the project page
+
+`/p/:project` is organised in tabs (`PageTabs`, the selected one is the URL parameter `tab`, so a tab can be linked and survives a reload): **Overview** (a table with what each module counts for the project, the modules that could not answer, then the `project:project-panels` slot), **Tasks**, **Flows**, **Queue** (what that module says about the project, from the `related` route: `tabs.<module>` of the response, with the reason when a module has nothing or did not answer), **Settings** (identity, hierarchy, folders, removal). The tool tabs are fixed (task, flow, queue: the `optionalRequires`); a module outside that list appears only in the overview table and the slot. The statistics are the counts the modules send (`count` + `countLabel`, shown as `countText`): they have different units, so there is no chart; per-state or over-time figures need a contract extension on the `related` response.
+
 ### What other modules can add to the project page
 
 The detail page embeds two `ExtensionSlot`s. A contributor lists `"requires": { "project": "*" }` (or `optionalRequires` if it works without this module) and adds an `extensionPoints` entry `{ "kind": "widget", "slot": "project:<slot>", "view": ... }`.

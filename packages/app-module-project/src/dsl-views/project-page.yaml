@@ -135,295 +135,391 @@ sections:
     to: $sources.detail.project.parent.href
     size: sm
 
-  - $type: Section
+  # The page is organised in tabs, the selected one is kept in the URL (?tab=): everything that happens in the project first (overview,
+  # one tab per tool), the settings of the registry entry last. A tab per tool is static: the tools are the optionalRequires of the manifest.
+  - $type: PageTabs
     $if: $sources.detail.project
-    title: Identity
-    items:
-      - $type: VerticalStack
-        gap: gap-1
-        items:
+    urlParam: tab
+    tabs:
+      - id: overview
+        label: Overview
+        children:
+          - $type: Section
+            title: Statistics
+            items:
+              - $type: Badge
+                $if: $sources.related.errorText
+                label: $sources.related.errorText
+                variant: warning
+              - $type: Badge
+                $if: $sources.related.emptyText
+                label: $sources.related.emptyText
+                variant: info
+              - $type: DataTable
+                $if: $sources.related.hasPanels
+                rows: $sources.related.summary
+                navigateTo: '{href}'
+                emptyMessage: Nothing related
+                columns:
+                  - { key: 'module', label: 'Module', nowrap: true }
+                  - { key: 'title', label: 'What' }
+                  - { key: 'countText', label: 'Count', nowrap: true }
+                  - { key: 'noteText', label: '', nowrap: true }
+                  - { key: 'seeAllText', label: '', href: '{href}', nowrap: true }
+              - $type: VerticalStack
+                $if: $sources.related.warnings.length
+                gap: gap-1
+                items:
+                  - $type: DataTable
+                    rows: $sources.related.warnings
+                    emptyMessage: No warning
+                    columns:
+                      - { key: 'text', label: 'Modules that could not answer' }
+          # Extension point project:project-panels.
+          - $type: ExtensionSlot
+            $if: $sources.detail.project
+            items: $sources.panels
+      - id: task
+        label: Tasks
+        children:
           - $type: Badge
-            label: $sources.detail.project.idLine
+            $if: $sources.related.tabs.task.emptyText
+            label: $sources.related.tabs.task.emptyText
+            variant: info
+          - $type: Section
+            $if: $sources.related.tabs.task.title
+            title: $sources.related.tabs.task.title
+            items:
+              - $type: HorizontalStack
+                gap: gap-2
+                items:
+                  - $type: Badge
+                    label: $sources.related.tabs.task.countText
+                  - $type: Badge
+                    $if: $sources.related.tabs.task.noteText
+                    label: $sources.related.tabs.task.noteText
+                    variant: warning
+                  - $type: ButtonLink
+                    $if: $sources.related.tabs.task.seeAllText
+                    label: See all tasks
+                    to: $sources.related.tabs.task.href
+                    size: sm
+              - $type: DataTable
+                rows: $sources.related.tabs.task.rows
+                navigateTo: '{href}'
+                emptyMessage: Nothing yet
+                columns:
+                  - { key: 'label', label: 'Item' }
+                  - { key: 'subtitle', label: '' }
+      - id: flow
+        label: Flows
+        children:
           - $type: Badge
-            label: $sources.detail.project.aliasesLine
+            $if: $sources.related.tabs.flow.emptyText
+            label: $sources.related.tabs.flow.emptyText
+            variant: info
+          - $type: Section
+            $if: $sources.related.tabs.flow.title
+            title: $sources.related.tabs.flow.title
+            items:
+              - $type: HorizontalStack
+                gap: gap-2
+                items:
+                  - $type: Badge
+                    label: $sources.related.tabs.flow.countText
+                  - $type: Badge
+                    $if: $sources.related.tabs.flow.noteText
+                    label: $sources.related.tabs.flow.noteText
+                    variant: warning
+                  - $type: ButtonLink
+                    $if: $sources.related.tabs.flow.seeAllText
+                    label: See all flow executions
+                    to: $sources.related.tabs.flow.href
+                    size: sm
+              - $type: DataTable
+                rows: $sources.related.tabs.flow.rows
+                navigateTo: '{href}'
+                emptyMessage: Nothing yet
+                columns:
+                  - { key: 'label', label: 'Item' }
+                  - { key: 'subtitle', label: '' }
+      - id: queue
+        label: Queue
+        children:
           - $type: Badge
-            label: $sources.detail.project.labelsLine
-          - $type: Badge
-            label: $sources.detail.project.gitLine
-      - $type: Form
-        onSubmit: $ctx.rename
-        initialData: $sources.detail.forms.rename
-        fields:
-          - $type: FieldText
-            label: Name
-            bind: name
-            required: true
-        actions:
-          - $type: ButtonSave
-            label: Rename
-      - $type: Form
-        onSubmit: $ctx.addAlias
-        initialData: $sources.detail.forms.empty
-        fields:
-          - $type: FieldText
-            label: New alias
-            bind: alias
-            required: true
-        actions:
-          - $type: ButtonSave
-            label: Add the alias
-      - $type: Form
-        $if: $sources.detail.options.aliases.length
-        onSubmit: $ctx.removeAlias
-        initialData: $sources.detail.forms.empty
-        fields:
-          - $type: FieldSelect
-            label: Alias to remove
-            bind: alias
-            options: $sources.detail.options.aliases
-            placeholder: Choose an alias
-            required: true
-        actions:
-          - $type: ButtonSave
-            label: Remove the alias
-      - $type: Form
-        onSubmit: $ctx.addLabels
-        initialData: $sources.detail.forms.empty
-        fields:
-          - $type: FieldText
-            label: Labels to add (separated by spaces or commas, e.g. state::production team::blue)
-            bind: labels
-            required: true
-        actions:
-          - $type: ButtonSave
-            label: Add the labels
-      - $type: Form
-        $if: $sources.detail.options.labels.length
-        onSubmit: $ctx.removeLabels
-        initialData: $sources.detail.forms.empty
-        fields:
-          - $type: FieldSelect
-            label: Label to remove
-            bind: labels
-            options: $sources.detail.options.labels
-            placeholder: Choose a label
-            required: true
-        actions:
-          - $type: ButtonSave
-            label: Remove the label
-      - $type: Form
-        onSubmit: $ctx.setGit
-        initialData: $sources.detail.forms.git
-        fields:
-          - $type: FieldText
-            label: Git url
-            bind: git
-            required: true
-        actions:
-          - $type: ButtonSave
-            label: Set the git url
-      - $type: Form
-        $if: $sources.detail.project.git
-        onSubmit: $ctx.clearGit
-        initialData: $sources.detail.forms.empty
-        fields: []
-        actions:
-          - $type: ButtonAction
-            label: Clear the git url
-            variant: danger
-            type: submit
+            $if: $sources.related.tabs.queue.emptyText
+            label: $sources.related.tabs.queue.emptyText
+            variant: info
+          - $type: Section
+            $if: $sources.related.tabs.queue.title
+            title: $sources.related.tabs.queue.title
+            items:
+              - $type: HorizontalStack
+                gap: gap-2
+                items:
+                  - $type: Badge
+                    label: $sources.related.tabs.queue.countText
+                  - $type: Badge
+                    $if: $sources.related.tabs.queue.noteText
+                    label: $sources.related.tabs.queue.noteText
+                    variant: warning
+                  - $type: ButtonLink
+                    $if: $sources.related.tabs.queue.seeAllText
+                    label: See all queue entries
+                    to: $sources.related.tabs.queue.href
+                    size: sm
+              - $type: DataTable
+                rows: $sources.related.tabs.queue.rows
+                navigateTo: '{href}'
+                emptyMessage: Nothing yet
+                columns:
+                  - { key: 'label', label: 'Item' }
+                  - { key: 'subtitle', label: '' }
+      - id: settings
+        label: Settings
+        children:
+          - $type: Section
+            $if: $sources.detail.project
+            title: Identity
+            items:
+              - $type: VerticalStack
+                gap: gap-1
+                items:
+                  - $type: Badge
+                    label: $sources.detail.project.idLine
+                  - $type: Badge
+                    label: $sources.detail.project.aliasesLine
+                  - $type: Badge
+                    label: $sources.detail.project.labelsLine
+                  - $type: Badge
+                    label: $sources.detail.project.gitLine
+              - $type: Form
+                onSubmit: $ctx.rename
+                initialData: $sources.detail.forms.rename
+                fields:
+                  - $type: FieldText
+                    label: Name
+                    bind: name
+                    required: true
+                actions:
+                  - $type: ButtonSave
+                    label: Rename
+              - $type: Form
+                onSubmit: $ctx.addAlias
+                initialData: $sources.detail.forms.empty
+                fields:
+                  - $type: FieldText
+                    label: New alias
+                    bind: alias
+                    required: true
+                actions:
+                  - $type: ButtonSave
+                    label: Add the alias
+              - $type: Form
+                $if: $sources.detail.options.aliases.length
+                onSubmit: $ctx.removeAlias
+                initialData: $sources.detail.forms.empty
+                fields:
+                  - $type: FieldSelect
+                    label: Alias to remove
+                    bind: alias
+                    options: $sources.detail.options.aliases
+                    placeholder: Choose an alias
+                    required: true
+                actions:
+                  - $type: ButtonSave
+                    label: Remove the alias
+              - $type: Form
+                onSubmit: $ctx.addLabels
+                initialData: $sources.detail.forms.empty
+                fields:
+                  - $type: FieldText
+                    label: Labels to add (separated by spaces or commas, e.g. state::production team::blue)
+                    bind: labels
+                    required: true
+                actions:
+                  - $type: ButtonSave
+                    label: Add the labels
+              - $type: Form
+                $if: $sources.detail.options.labels.length
+                onSubmit: $ctx.removeLabels
+                initialData: $sources.detail.forms.empty
+                fields:
+                  - $type: FieldSelect
+                    label: Label to remove
+                    bind: labels
+                    options: $sources.detail.options.labels
+                    placeholder: Choose a label
+                    required: true
+                actions:
+                  - $type: ButtonSave
+                    label: Remove the label
+              - $type: Form
+                onSubmit: $ctx.setGit
+                initialData: $sources.detail.forms.git
+                fields:
+                  - $type: FieldText
+                    label: Git url
+                    bind: git
+                    required: true
+                actions:
+                  - $type: ButtonSave
+                    label: Set the git url
+              - $type: Form
+                $if: $sources.detail.project.git
+                onSubmit: $ctx.clearGit
+                initialData: $sources.detail.forms.empty
+                fields: []
+                actions:
+                  - $type: ButtonAction
+                    label: Clear the git url
+                    variant: danger
+                    type: submit
 
-  - $type: Section
-    $if: $sources.detail.project
-    title: Hierarchy
-    items:
-      - $type: DataTable
-        $if: $sources.detail.project.hasChildren
-        rows: $sources.detail.project.children
-        navigateTo: '{href}'
-        emptyMessage: No child
-        columns:
-          - { key: 'name', label: 'Children', nowrap: true }
-          - { key: 'id', label: 'ID', mono: true, nowrap: true }
-          - { key: 'virtualText', label: '', nowrap: true }
-      - $type: DataTable
-        $if: $sources.detail.project.descendantsCount
-        rows: $sources.detail.project.descendants
-        navigateTo: '{href}'
-        emptyMessage: No descendant
-        columns:
-          - { key: 'name', label: 'All descendants', nowrap: true }
-          - { key: 'parentName', label: 'Parent', nowrap: true }
-          - { key: 'id', label: 'ID', mono: true, nowrap: true }
-      - $type: Form
-        onSubmit: $ctx.setParent
-        initialData: $sources.detail.forms.parent
-        fields:
-          - $type: FieldSelect
-            label: Parent
-            bind: parent
-            options: $sources.detail.options.parents
-            placeholder: Choose a parent
-            required: true
-        actions:
-          - $type: ButtonSave
-            label: Set the parent
-      - $type: Form
-        $if: $sources.detail.project.parent
-        onSubmit: $ctx.clearParent
-        initialData: $sources.detail.forms.empty
-        fields: []
-        actions:
-          - $type: ButtonAction
-            label: Remove the parent
-            variant: danger
-            type: submit
+          - $type: Section
+            $if: $sources.detail.project
+            title: Hierarchy
+            items:
+              - $type: DataTable
+                $if: $sources.detail.project.hasChildren
+                rows: $sources.detail.project.children
+                navigateTo: '{href}'
+                emptyMessage: No child
+                columns:
+                  - { key: 'name', label: 'Children', nowrap: true }
+                  - { key: 'id', label: 'ID', mono: true, nowrap: true }
+                  - { key: 'virtualText', label: '', nowrap: true }
+              - $type: DataTable
+                $if: $sources.detail.project.descendantsCount
+                rows: $sources.detail.project.descendants
+                navigateTo: '{href}'
+                emptyMessage: No descendant
+                columns:
+                  - { key: 'name', label: 'All descendants', nowrap: true }
+                  - { key: 'parentName', label: 'Parent', nowrap: true }
+                  - { key: 'id', label: 'ID', mono: true, nowrap: true }
+              - $type: Form
+                onSubmit: $ctx.setParent
+                initialData: $sources.detail.forms.parent
+                fields:
+                  - $type: FieldSelect
+                    label: Parent
+                    bind: parent
+                    options: $sources.detail.options.parents
+                    placeholder: Choose a parent
+                    required: true
+                actions:
+                  - $type: ButtonSave
+                    label: Set the parent
+              - $type: Form
+                $if: $sources.detail.project.parent
+                onSubmit: $ctx.clearParent
+                initialData: $sources.detail.forms.empty
+                fields: []
+                actions:
+                  - $type: ButtonAction
+                    label: Remove the parent
+                    variant: danger
+                    type: submit
 
-  - $type: Section
-    $if: $sources.detail.project
-    title: Folders
-    items:
-      - $type: Badge
-        $if: $sources.detail.project.virtualText
-        label: No folder is registered (virtual project). Add one below.
-        variant: info
-      - $type: DataTable
-        $if: $sources.detail.project.hasPaths
-        rows: $sources.detail.project.paths
-        emptyMessage: No folder
-        columns:
-          - { key: 'pathText', label: 'Path', mono: true, truncate: true, title: '{pathText}' }
-          - { key: 'mainText', label: '', nowrap: true }
-      - $type: Badge
-        label: $sources.detail.project.toolFoldersText
-      - $type: Form
-        onSubmit: $ctx.addPath
-        initialData: $sources.detail.forms.empty
-        fields:
-          - $type: FieldText
-            label: Folder to add (an existing folder)
-            bind: path
-            required: true
-          - $type: Switch
-            label: Make it the main folder
-            bind: main
-        actions:
-          - $type: ButtonSave
-            label: Add the folder
-      - $type: Form
-        $if: $sources.detail.options.otherPaths.length
-        onSubmit: $ctx.setMain
-        initialData: $sources.detail.forms.empty
-        fields:
-          - $type: FieldSelect
-            label: New main folder
-            bind: path
-            options: $sources.detail.options.otherPaths
-            placeholder: Choose a folder
-            required: true
-        actions:
-          - $type: ButtonSave
-            label: Make it the main folder
-      - $type: Form
-        $if: $sources.detail.options.paths.length
-        onSubmit: $ctx.movePath
-        initialData: $sources.detail.forms.empty
-        fields:
-          - $type: FieldSelect
-            label: Folder that moved
-            bind: from
-            options: $sources.detail.options.paths
-            placeholder: Choose a folder
-            required: true
-          - $type: FieldText
-            label: Its new location (an existing folder)
-            bind: to
-            required: true
-        actions:
-          - $type: ButtonSave
-            label: Move the folder
-      - $type: Form
-        $if: $sources.detail.options.paths.length
-        onSubmit: $ctx.removePath
-        initialData: $sources.detail.forms.empty
-        fields:
-          - $type: FieldSelect
-            label: Folder to remove
-            bind: path
-            options: $sources.detail.options.paths
-            placeholder: Choose a folder
-            required: true
-          - $type: FieldSelect
-            $if: $sources.detail.options.otherPaths.length
-            label: New main folder (needed when removing the main folder)
-            bind: newMain
-            options: $sources.detail.options.otherPaths
-            placeholder: Keep the current main folder
-        actions:
-          - $type: ButtonSave
-            label: Remove the folder
+          - $type: Section
+            $if: $sources.detail.project
+            title: Folders
+            items:
+              - $type: Badge
+                $if: $sources.detail.project.virtualText
+                label: No folder is registered (virtual project). Add one below.
+                variant: info
+              - $type: DataTable
+                $if: $sources.detail.project.hasPaths
+                rows: $sources.detail.project.paths
+                emptyMessage: No folder
+                columns:
+                  - { key: 'pathText', label: 'Path', mono: true, truncate: true, title: '{pathText}' }
+                  - { key: 'mainText', label: '', nowrap: true }
+              - $type: Badge
+                label: $sources.detail.project.toolFoldersText
+              - $type: Form
+                onSubmit: $ctx.addPath
+                initialData: $sources.detail.forms.empty
+                fields:
+                  - $type: FieldText
+                    label: Folder to add (an existing folder)
+                    bind: path
+                    required: true
+                  - $type: Switch
+                    label: Make it the main folder
+                    bind: main
+                actions:
+                  - $type: ButtonSave
+                    label: Add the folder
+              - $type: Form
+                $if: $sources.detail.options.otherPaths.length
+                onSubmit: $ctx.setMain
+                initialData: $sources.detail.forms.empty
+                fields:
+                  - $type: FieldSelect
+                    label: New main folder
+                    bind: path
+                    options: $sources.detail.options.otherPaths
+                    placeholder: Choose a folder
+                    required: true
+                actions:
+                  - $type: ButtonSave
+                    label: Make it the main folder
+              - $type: Form
+                $if: $sources.detail.options.paths.length
+                onSubmit: $ctx.movePath
+                initialData: $sources.detail.forms.empty
+                fields:
+                  - $type: FieldSelect
+                    label: Folder that moved
+                    bind: from
+                    options: $sources.detail.options.paths
+                    placeholder: Choose a folder
+                    required: true
+                  - $type: FieldText
+                    label: Its new location (an existing folder)
+                    bind: to
+                    required: true
+                actions:
+                  - $type: ButtonSave
+                    label: Move the folder
+              - $type: Form
+                $if: $sources.detail.options.paths.length
+                onSubmit: $ctx.removePath
+                initialData: $sources.detail.forms.empty
+                fields:
+                  - $type: FieldSelect
+                    label: Folder to remove
+                    bind: path
+                    options: $sources.detail.options.paths
+                    placeholder: Choose a folder
+                    required: true
+                  - $type: FieldSelect
+                    $if: $sources.detail.options.otherPaths.length
+                    label: New main folder (needed when removing the main folder)
+                    bind: newMain
+                    options: $sources.detail.options.otherPaths
+                    placeholder: Keep the current main folder
+                actions:
+                  - $type: ButtonSave
+                    label: Remove the folder
 
-  # Extension point project:project-panels.
-  - $type: ExtensionSlot
-    $if: $sources.detail.project
-    items: $sources.panels
-
-  - $type: Section
-    $if: $sources.detail.project
-    title: Related
-    items:
-      - $type: Badge
-        $if: $sources.related.errorText
-        label: $sources.related.errorText
-        variant: warning
-      - $type: Badge
-        $if: $sources.related.emptyText
-        label: $sources.related.emptyText
-        variant: info
-      - $type: VerticalStack
-        $if: $sources.related.warnings.length
-        gap: gap-1
-        items:
-          - $type: DataTable
-            rows: $sources.related.warnings
-            emptyMessage: No warning
-            columns:
-              - { key: 'text', label: 'Modules that could not answer' }
-      - $type: DataTable
-        $if: $sources.related.hasPanels
-        rows: $sources.related.summary
-        navigateTo: '{href}'
-        emptyMessage: Nothing related
-        columns:
-          - { key: 'module', label: 'Module', nowrap: true }
-          - { key: 'title', label: 'What' }
-          - { key: 'countText', label: 'Count', nowrap: true }
-          - { key: 'noteText', label: '', nowrap: true }
-          - { key: 'seeAllText', label: '', href: '{href}', nowrap: true }
-      - $type: DataTable
-        $if: $sources.related.hasPanels
-        rows: $sources.related.rows
-        navigateTo: '{href}'
-        emptyMessage: Nothing related
-        columns:
-          - { key: 'panel', label: 'What', nowrap: true }
-          - { key: 'label', label: 'Item' }
-          - { key: 'subtitle', label: '' }
-
-  - $type: Section
-    $if: $sources.detail.project
-    title: Remove
-    items:
-      - $type: Form
-        onSubmit: $ctx.removeProject
-        initialData: $sources.detail.forms.empty
-        fields:
-          - $type: Switch
-            $if: $sources.detail.project.hasChildren
-            label: Also remove the descendants (required when the project has children)
-            bind: recursive
-        actions:
-          - $type: ButtonAction
-            label: Remove the project
-            variant: danger
-            type: submit
+          - $type: Section
+            $if: $sources.detail.project
+            title: Remove
+            items:
+              - $type: Form
+                onSubmit: $ctx.removeProject
+                initialData: $sources.detail.forms.empty
+                fields:
+                  - $type: Switch
+                    $if: $sources.detail.project.hasChildren
+                    label: Also remove the descendants (required when the project has children)
+                    bind: recursive
+                actions:
+                  - $type: ButtonAction
+                    label: Remove the project
+                    variant: danger
+                    type: submit

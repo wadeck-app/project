@@ -12,6 +12,9 @@ const negativeCache = new NegativeCache();
 
 const EMPTY_TEXT = 'No other module has anything to show for this project.';
 
+/** The tools that get a tab on the project page: the optionalRequires of the manifest (the page is static YAML, a tab cannot be generated). */
+const TOOL_MODULES = ['task', 'queue', 'flow'] as const;
+
 function baseUrl(): string {
   try {
     return appCoreBaseUrl(process.env);
@@ -44,6 +47,32 @@ export function registerRelatedRoute(kit: RouteKit): void {
       })),
       rows: panels.flatMap((p) => (p.items ?? []).map((item) => ({ module: p.module, panel: p.title, label: item.label, subtitle: item.subtitle ?? '', href: item.url }))),
       warnings,
+      // One tab per tool: what that module says about the project, or why there is nothing (the YAML shows emptyText when it is not empty).
+      tabs: Object.fromEntries(
+        TOOL_MODULES.map((module) => {
+          const panel = panels.find((p) => p.module === module);
+          const failure = all.find((p) => p.module === module && p.error !== undefined);
+          if (panel === undefined) {
+            const emptyText =
+              failure === undefined
+                ? `The ${module} module has nothing to show for this project (not installed, or no ${module} data for it).`
+                : `The ${module} module did not answer: ${failure.error}`;
+            return [module, { emptyText, rows: [] }];
+          }
+          return [
+            module,
+            {
+              emptyText: '',
+              title: panel.title,
+              countText: countTextOf({ ...panel, items: panel.items ?? [] }),
+              noteText: panel.truncated === true ? 'partial list' : '',
+              seeAllText: panel.moreUrl === undefined ? '' : 'See all',
+              href: panel.moreUrl ?? '',
+              rows: (panel.items ?? []).map((item) => ({ label: item.label, subtitle: item.subtitle ?? '', href: item.url })),
+            },
+          ];
+        }),
+      ),
       ...(all.length === 0 ? { emptyText: EMPTY_TEXT } : {}),
     });
   });
