@@ -98,7 +98,7 @@ Same stack as the task and queue CLIs. `npm run bundle` (esbuild, needs `BUNDLE_
 | File | Origin |
 |---|---|
 | Go launcher sources, `build.sh` | not copied: `@wadeck-app/singleton-daemon-kit` (devDependency), `ci/scripts/build-launcher.mjs` calls its `build.sh` with `ci/launcher-project.config.json` |
-| `ci/templates/bin-launcher.js.tmpl`, `ci/scripts/generate-platform-packages.sh` | copied unchanged from the canonical `ci-templates` repo (`templates/`, `scripts/`, last changed in commit 094d29e) |
+| `ci/templates/bin-launcher.js.tmpl`, `ci/scripts/generate-platform-packages.sh` | copied unchanged from the canonical `ci-templates` repo (`templates/`, `scripts/`, synced with ci-templates commit 4c1c235) |
 | `ci/scripts/build-launcher.mjs`, `copy-binaries.sh` | written here from the equivalent scripts of `task-cli` (names changed; the app-module is copied as in `task-cli`) |
 
 The canonical launcher template has no `windowsHide` and no `--cli-background` / `--cli-foreground` handling, which the task and queue copies added; the project CLI needs neither (no daemon, nothing spawns it in the background). If one day it does, change the template in `ci-templates` and copy it again.
