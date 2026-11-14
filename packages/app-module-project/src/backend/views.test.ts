@@ -62,6 +62,20 @@ function findForms(node: unknown, found: Record<string, unknown>[] = []): Record
   return found;
 }
 
+/** Every node of the given `$type`, at any depth. */
+function findNodes(node: unknown, type: string, found: Record<string, unknown>[] = []): Record<string, unknown>[] {
+  if (Array.isArray(node)) {
+    node.forEach((child) => findNodes(child, type, found));
+  } else if (node !== null && typeof node === 'object') {
+    const record = node as Record<string, unknown>;
+    if (record['$type'] === type) {
+      found.push(record);
+    }
+    Object.values(record).forEach((child) => findNodes(child, type, found));
+  }
+  return found;
+}
+
 describe('manifest.json', () => {
   it('has the id project, no version (the packaging stamps it), no dslLib and no backend path (the packaging fixes it)', () => {
     expect(manifest.id).toBe('project');
@@ -199,13 +213,44 @@ describe('dsl-views', () => {
     expect(page).not.toMatch(/\.count(?![A-Za-z])/);
   });
 
-  it('the detail page is organised in tabs kept in the URL: overview, one per tool, settings last', () => {
-    const page = parseView('project-page.yaml') as { sections: { $type: string; urlParam?: string; tabs?: { id: string; label: string; children: unknown[] }[] }[] };
-    const tabs = page.sections.find((s) => s.$type === 'PageTabs');
-    expect(tabs?.urlParam).toBe('tab');
-    expect(tabs?.tabs?.map((t) => t.id)).toEqual(['overview', 'task', 'flow', 'queue', 'settings']);
-    for (const tab of tabs?.tabs ?? []) {
+  // The page is one AbTest: `current` is the tabbed page (overview, one tab per tool, settings last, the tab kept in the URL).
+  interface AbVariant {
+    label: string;
+    hint: string;
+    view: unknown;
+  }
+  function abVariants(): { id: string; initial: string; variants: Record<string, AbVariant> } {
+    const page = parseView('project-page.yaml') as { sections: { $type: string; id?: string; initial?: string; variants?: Record<string, AbVariant> }[] };
+    expect(page.sections.map((s) => s.$type)).toEqual(['AbTest']);
+    const test = page.sections[0]!;
+    expect(test.id).toBe('detail-layout');
+    return { id: test.id!, initial: test.initial!, variants: test.variants! };
+  }
+
+  it('the detail page is organised in tabs kept in the URL in its current variant: overview, one per tool, settings last', () => {
+    const { initial, variants } = abVariants();
+    expect(initial).toBe('current');
+    const tabs = findNodes(variants['current']!.view, 'PageTabs')[0] as { urlParam?: string; tabs?: { id: string; label: string; children: unknown[] }[] };
+    expect(tabs.urlParam).toBe('tab');
+    expect(tabs.tabs?.map((t) => t.id)).toEqual(['overview', 'task', 'flow', 'queue', 'settings']);
+    for (const tab of tabs.tabs ?? []) {
       expect(tab.children.length, tab.id).toBeGreaterThan(0);
+    }
+  });
+
+  it('every layout variant keeps every action of the page, both slots and the removal switch', () => {
+    const { variants } = abVariants();
+    expect(Object.keys(variants).length).toBeGreaterThanOrEqual(4);
+    const page = parseView('project-page.yaml') as { $actions: Record<string, unknown> };
+    const actions = Object.keys(page.$actions).sort();
+    const submitted = (view: unknown): string[] => [...new Set(findForms(view).map((f) => String(f['onSubmit']).replace('$ctx.', '')))].sort();
+    for (const [id, variant] of Object.entries(variants)) {
+      expect(variant.label, id).toBeTruthy();
+      expect(variant.hint, id).toBeTruthy();
+      expect(submitted(variant.view), id).toEqual(actions);
+      expect(findNodes(variant.view, 'ExtensionSlot').map((n) => n['items']).sort(), id).toEqual(['$sources.links', '$sources.panels']);
+      expect(findNodes(variant.view, 'Switch').filter((n) => n['bind'] === 'recursive'), id).toHaveLength(1);
+      expect(findNodes(variant.view, 'PageHeader'), id).toHaveLength(1);
     }
   });
 

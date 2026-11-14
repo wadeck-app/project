@@ -16,3 +16,12 @@ export function countTextOf(panel: Pick<RelatedPanel, 'items'> & Partial<Related
   const recent = panel.moreUrl === undefined ? '' : 'recent ';
   return `${shown} ${recent}${shown === 1 ? 'item' : 'items'}`;
 }
+
+/** The figure of a StatTile: the number alone and what it counts (the tile label), same rules as countTextOf (a raw `count` only with its label). */
+export function figureOf(panel: Pick<RelatedPanel, 'items'> & Partial<RelatedPanel>): { figureText: string; figureLabel: string } {
+  const shown = panel.items.length;
+  if (panel.countLabel !== undefined) {
+    return { figureText: String(panel.count ?? shown), figureLabel: `${panel.title ?? 'Items'}: ${panel.countLabel}` };
+  }
+  return { figureText: String(shown), figureLabel: `${panel.title ?? 'Items'}: ${panel.moreUrl === undefined ? 'items' : 'recent items'}` };
+}

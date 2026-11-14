@@ -1,6 +1,6 @@
 import { defaultRegistryDir, loadRegistry } from '@wadeck-app/project-sdk';
 import { appCoreBaseUrl } from './appCore.js';
-import { countTextOf } from './countText.js';
+import { countTextOf, figureOf } from './countText.js';
 import { RequestError } from './httpError.js';
 import { NegativeCache, collectRelated } from './related.js';
 import { findLive } from './readRoutes.js';
@@ -65,6 +65,8 @@ export function registerRelatedRoute(kit: RouteKit): void {
               emptyText: '',
               title: panel.title,
               countText: countTextOf({ ...panel, items: panel.items ?? [] }),
+              // The number alone and what it counts, for the StatTile of the tool.
+              ...figureOf({ ...panel, items: panel.items ?? [] }),
               noteText: panel.truncated === true ? 'partial list' : '',
               seeAllText: panel.moreUrl === undefined ? '' : 'See all',
               href: panel.moreUrl ?? '',

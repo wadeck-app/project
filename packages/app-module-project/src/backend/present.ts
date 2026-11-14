@@ -80,8 +80,13 @@ export interface TreeRow {
   id: string;
   name: string;
   depth: number;
-  /** The name drawn with its depth (ASCII), for a table cell. */
+  /** The name drawn with its depth for a table cell: the indent is made of non-breaking spaces, a table cell collapses plain ones. */
   treeLabel: string;
+  /** Id of the parent shown in the tree ('' for a root, also for a project whose parent is missing from the registry). */
+  parentId: string;
+  /** Direct children, and all descendants (0 for a leaf). */
+  childCount: number;
+  descendantCount: number;
   virtual: boolean;
   virtualText: string;
   aliasesText: string;
@@ -90,8 +95,11 @@ export interface TreeRow {
   href: string;
 }
 
+// The character between the quotes is U+00A0 (non-breaking space), not a plain space: keep it when editing.
+const NBSP =' ';
+
 function treeLabel(name: string, depth: number): string {
-  return depth === 0 ? name : `${'  '}${'    '.repeat(depth - 1)}|-- ${name}`;
+  return depth === 0 ? name : `${NBSP.repeat(2)}${NBSP.repeat(4).repeat(depth - 1)}|--${NBSP}${name}`;
 }
 
 /**
@@ -116,6 +124,9 @@ export function treeRows(registry: Registry): { rows: TreeRow[]; warnings: strin
       name: project.name,
       depth,
       treeLabel: treeLabel(project.name, depth),
+      parentId: depth === 0 || project.parent === undefined ? '' : project.parent,
+      childCount: getChildren(registry, project).length,
+      descendantCount: getDescendants(registry, project).length,
       virtual: row.virtual,
       virtualText: row.virtualText,
       aliasesText: row.aliasesText,

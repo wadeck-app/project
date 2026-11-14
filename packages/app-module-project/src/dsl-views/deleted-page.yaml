@@ -1,56 +1,360 @@
-# Trash (nav /deleted): the removed projects, and the restore form. Removing a project keeps its tool folders, so a restore brings
+# Trash (nav /deleted): the removed projects, and the restore. Removing a project keeps its tool folders, so a restore brings
 # everything back. The restore of a child whose parent is still in the trash is refused with the way out (restore both with
 # "Also restore the descendants" on the parent); the refusal is shown as a toast with the server message.
+# A/B VARIANTS (AbTest "trash-layout", dev builds only): the user picks one in the floating dock, the others are deleted afterwards.
+# The variants with a Restore button per row run restoreProject with the id of the row (a row action sends no body: the descendants stay in the form).
 $sources:
   deleted:
     url: GET /api/modules/project/deleted?inlineErrors=true
 
-# {ref} is the project chosen in the select of the form.
+# {id} is the project chosen in the select of the form (bind: id), or the id of the clicked row.
 $actions:
   restoreProject:
-    url: POST /api/modules/project/deleted/{ref}/restore
+    url: POST /api/modules/project/deleted/{id}/restore
     successMessage: Project restored
     errorPrefix: Could not restore
     reloadSources: true
 
 $type: PageContent
 sections:
-  - $type: PageHeader
-    title: Trash
-    subtitle: Removed projects. Restore one to bring it back with its folders.
-  - $type: Badge
-    $if: $sources.deleted.errorText
-    label: $sources.deleted.errorText
-    variant: danger
-  - $type: Badge
-    $if: $sources.deleted.emptyText
-    label: $sources.deleted.emptyText
-    variant: info
-  - $type: DataTable
-    $if: $sources.deleted.count
-    rows: $sources.deleted.projects
-    emptyMessage: The trash is empty
-    columns:
-      - { key: 'id', label: 'ID', mono: true, nowrap: true }
-      - { key: 'name', label: 'Name', nowrap: true }
-      - { key: 'aliasesText', label: 'Aliases' }
-      - { key: 'parentName', label: 'Parent', nowrap: true }
-      - { key: 'labelsText', label: 'Labels' }
-      - { key: 'deletedAt', label: 'Removed at', nowrap: true }
-  - $type: Form
-    $if: $sources.deleted.count
-    onSubmit: $ctx.restoreProject
-    initialData: {}
-    fields:
-      - $type: FieldSelect
-        label: Project to restore
-        bind: ref
-        options: $sources.deleted.options
-        placeholder: Choose a project
-        required: true
-      - $type: Switch
-        label: Also restore the descendants removed with it
-        bind: recursive
-    actions:
-      - $type: ButtonSave
-        label: Restore
+  - $type: AbTest
+    id: trash-layout
+    label: Trash layout
+    initial: current
+    variants:
+      # ---------------------------------------------------------------------------------------------------------------
+      current:
+        label: Current
+        hint: Today's page unchanged - header, small empty badge, table, then a select + switch form.
+        view:
+          $type: VerticalStack
+          items:
+            - $type: PageHeader
+              title: Trash
+              subtitle: Removed projects. Restore one to bring it back with its folders.
+            - $type: Badge
+              $if: $sources.deleted.errorText
+              label: $sources.deleted.errorText
+              variant: danger
+            - $type: Badge
+              $if: $sources.deleted.emptyText
+              label: $sources.deleted.emptyText
+              variant: info
+            - $type: DataTable
+              $if: $sources.deleted.count
+              rows: $sources.deleted.projects
+              emptyMessage: The trash is empty
+              columns:
+                - { key: 'id', label: 'ID', mono: true, nowrap: true }
+                - { key: 'name', label: 'Name', nowrap: true }
+                - { key: 'aliasesText', label: 'Aliases' }
+                - { key: 'parentName', label: 'Parent', nowrap: true }
+                - { key: 'labelsText', label: 'Labels' }
+                - { key: 'deletedAt', label: 'Removed at', nowrap: true }
+            - $type: Form
+              $if: $sources.deleted.count
+              onSubmit: $ctx.restoreProject
+              initialData: {}
+              fields:
+                - $type: FieldSelect
+                  label: Project to restore
+                  bind: id
+                  options: $sources.deleted.options
+                  placeholder: Choose a project
+                  required: true
+                - $type: Switch
+                  label: Also restore the descendants removed with it
+                  bind: recursive
+              actions:
+                - $type: ButtonSave
+                  label: Restore
+
+      # ---------------------------------------------------------------------------------------------------------------
+      table:
+        label: Table + row button
+        hint: One Restore button per row, the folder and the removal date in the table, the descendants form folded below. Rich empty state.
+        view:
+          $type: VerticalStack
+          items:
+            - $type: PageHeader
+              title: Trash
+              subtitle: Removed projects stay here with their data and folders until you restore them.
+            - $type: Badge
+              $if: $sources.deleted.errorText
+              label: $sources.deleted.errorText
+              variant: danger
+            # Empty state: what the trash is, how a project gets here, where to go.
+            - $type: Card
+              $if: $sources.deleted.emptyText
+              padding: lg
+              items:
+                - $type: VerticalStack
+                  items:
+                    - $type: Markdown
+                      text: |
+                        **The trash is empty.**
+
+                        When you remove a project it lands here instead of being erased: its registration is parked, and its tool folders and data are kept untouched.
+                        You can restore it from this page at any time.
+                    - $type: ButtonLink
+                      label: Go to the projects
+                      to: /modules/project/
+                      variant: secondary
+                      size: sm
+            - $type: DataTable
+              $if: $sources.deleted.count
+              rows: $sources.deleted.projects
+              emptyMessage: The trash is empty
+              columns:
+                - { key: 'name', label: 'Name', nowrap: true }
+                - { key: 'id', label: 'ID', mono: true, nowrap: true, muted: true }
+                - { key: 'parentName', label: 'Parent', nowrap: true }
+                - { key: 'mainPathText', label: 'Folder', mono: true, truncate: true }
+                - { key: 'deletedAt', label: 'Removed', nowrap: true, format: datetime, sortable: true }
+                - type: actions
+                  items:
+                    - { label: Restore, action: restoreProject, icon: rotate-ccw, variant: primary, condition: '!hasDeletedParent' }
+            - $type: Markdown
+              $if: $sources.deleted.count
+              text: |
+                A project whose parent is also in the trash has no button: restore both at once with the form below.
+                A restore is refused, and nothing changes, when its name, alias or folder is already used by a live project, when its folder is gone, or when its parent is not live.
+            - $type: Collapsible
+              $if: $sources.deleted.count
+              title: Restore a project together with its descendants
+              items:
+                - $type: Form
+                  onSubmit: $ctx.restoreProject
+                  initialData: {}
+                  fields:
+                    - $type: FieldSelect
+                      label: Project to restore
+                      bind: id
+                      options: $sources.deleted.options
+                      placeholder: Choose a project
+                      required: true
+                    - $type: Switch
+                      label: Also restore the descendants removed with it
+                      bind: recursive
+                  actions:
+                    - $type: ButtonSave
+                      label: Restore
+
+      # ---------------------------------------------------------------------------------------------------------------
+      form-first:
+        label: Restore first
+        hint: The restore form is the main block at the top, with the rules written next to it; the list of what is in the trash comes after.
+        view:
+          $type: VerticalStack
+          items:
+            - $type: PageHeader
+              title: Trash
+              subtitle: Bring a removed project back, with its folders and data.
+            - $type: Badge
+              $if: $sources.deleted.errorText
+              label: $sources.deleted.errorText
+              variant: danger
+            - $type: Card
+              $if: $sources.deleted.emptyText
+              padding: lg
+              items:
+                - $type: VerticalStack
+                  items:
+                    - $type: Markdown
+                      text: |
+                        **Nothing to restore.**
+
+                        A project you remove is moved to the trash with its tool folders and data kept, so it can come back here.
+                    - $type: ButtonLink
+                      label: Go to the projects
+                      to: /modules/project/
+                      variant: secondary
+                      size: sm
+            - $type: Card
+              $if: $sources.deleted.count
+              padding: lg
+              header: Restore a project
+              items:
+                - $type: VerticalStack
+                  items:
+                    - $type: Form
+                      onSubmit: $ctx.restoreProject
+                      initialData: {}
+                      fields:
+                        - $type: FieldSelect
+                          label: Project to restore
+                          bind: id
+                          options: $sources.deleted.options
+                          placeholder: Choose a project
+                          required: true
+                        - $type: Switch
+                          label: Also restore the descendants removed with it
+                          bind: recursive
+                      actions:
+                        - $type: ButtonSave
+                          label: Restore
+                    - $type: Markdown
+                      text: |
+                        The restore is refused, and nothing changes, when:
+
+                        - its name, an alias or a folder is already used by a live project (rename or remove that one first);
+                        - its folder no longer exists (recreate it);
+                        - its parent is still in the trash (restore the parent first, or switch on the descendants and pick the parent).
+            - $type: Section
+              $if: $sources.deleted.count
+              title: In the trash
+              items:
+                - $type: DataTable
+                  rows: $sources.deleted.projects
+                  emptyMessage: The trash is empty
+                  columns:
+                    - { key: 'name', label: 'Name', nowrap: true }
+                    - { key: 'id', label: 'ID', mono: true, nowrap: true, muted: true }
+                    - { key: 'aliasesText', label: 'Aliases' }
+                    - { key: 'parentName', label: 'Parent', nowrap: true }
+                    - { key: 'labelsText', label: 'Labels' }
+                    - { key: 'mainPathText', label: 'Folder', mono: true, truncate: true }
+                    - { key: 'deletedAt', label: 'Removed', nowrap: true, format: datetime, sortable: true }
+
+      # ---------------------------------------------------------------------------------------------------------------
+      split:
+        label: Split
+        hint: The table on the left with a Restore button per row, a permanent "what restoring does" panel on the right (also shown when empty).
+        view:
+          $type: VerticalStack
+          items:
+            - $type: PageHeader
+              title: Trash
+              subtitle: Removed projects, ready to come back.
+            - $type: Badge
+              $if: $sources.deleted.errorText
+              label: $sources.deleted.errorText
+              variant: danger
+            - $type: HorizontalStack
+              gap: gap-6
+              align: items-start
+              itemSizes: [flex, fixed]
+              items:
+                - $type: VerticalStack
+                  items:
+                    - $type: Card
+                      $if: $sources.deleted.emptyText
+                      padding: lg
+                      items:
+                        - $type: Markdown
+                          text: |
+                            **The trash is empty.**
+
+                            Nothing has been removed, or everything removed was restored.
+                    - $type: DataTable
+                      $if: $sources.deleted.count
+                      rows: $sources.deleted.projects
+                      emptyMessage: The trash is empty
+                      columns:
+                        - { key: 'name', label: 'Name', nowrap: true }
+                        - { key: 'parentName', label: 'Parent', nowrap: true }
+                        - { key: 'mainPathText', label: 'Folder', mono: true, truncate: true }
+                        - { key: 'deletedAt', label: 'Removed', nowrap: true, format: datetime, sortable: true }
+                        - type: actions
+                          items:
+                            - { label: Restore, action: restoreProject, icon: rotate-ccw, variant: primary, condition: '!hasDeletedParent' }
+                - $type: Card
+                  padding: lg
+                  header: What restoring does
+                  items:
+                    - $type: VerticalStack
+                      items:
+                        - $type: Markdown
+                          text: |
+                            **How a project gets here.** Removing it parks its registration; its folders and data are not touched.
+
+                            **Restore** puts it back as it was. It is refused, with nothing changed, if:
+
+                            - its name, an alias or a folder is used by a live project;
+                            - its folder no longer exists;
+                            - its parent is still in the trash (no button on that row).
+                        - $type: Form
+                          $if: $sources.deleted.count
+                          onSubmit: $ctx.restoreProject
+                          initialData: {}
+                          fields:
+                            - $type: FieldSelect
+                              label: Restore with its descendants
+                              bind: id
+                              options: $sources.deleted.options
+                              placeholder: Choose a project
+                              required: true
+                            - $type: Switch
+                              label: Also restore the descendants removed with it
+                              bind: recursive
+                          actions:
+                            - $type: ButtonSave
+                              label: Restore
+
+      # ---------------------------------------------------------------------------------------------------------------
+      minimal:
+        label: Minimal
+        hint: Only a short list (name, removal date, Restore button); the descendants form and the rules are folded. Rich empty state.
+        view:
+          $type: VerticalStack
+          items:
+            - $type: PageHeader
+              title: Trash
+            - $type: Badge
+              $if: $sources.deleted.errorText
+              label: $sources.deleted.errorText
+              variant: danger
+            - $type: Card
+              $if: $sources.deleted.emptyText
+              padding: lg
+              items:
+                - $type: VerticalStack
+                  items:
+                    - $type: Markdown
+                      text: |
+                        **Nothing here.** Removed projects are kept here, with their folders and data, so you can restore them.
+                    - $type: ButtonLink
+                      label: Back to the projects
+                      to: /modules/project/
+                      variant: secondary
+                      size: sm
+            - $type: DataTable
+              $if: $sources.deleted.count
+              rows: $sources.deleted.projects
+              emptyMessage: The trash is empty
+              columns:
+                - { key: 'name', label: 'Name', nowrap: true }
+                - { key: 'deletedAt', label: 'Removed', nowrap: true, format: datetime, sortable: true }
+                - type: actions
+                  items:
+                    - { label: Restore, action: restoreProject, icon: rotate-ccw, variant: primary, condition: '!hasDeletedParent' }
+              expansionCondition: id
+              expansion:
+                $type: Markdown
+                text: $ctx.row.mainPathText
+            - $type: Collapsible
+              $if: $sources.deleted.count
+              title: Descendants and restore rules
+              items:
+                - $type: VerticalStack
+                  items:
+                    - $type: Markdown
+                      text: |
+                        Open a row to see its folder. A row without a button has a parent that is also in the trash: restore both here.
+                        A restore is refused, with nothing changed, when a live project already uses its name, alias or folder, or when its folder is gone.
+                    - $type: Form
+                      onSubmit: $ctx.restoreProject
+                      initialData: {}
+                      fields:
+                        - $type: FieldSelect
+                          label: Project to restore
+                          bind: id
+                          options: $sources.deleted.options
+                          placeholder: Choose a project
+                          required: true
+                        - $type: Switch
+                          label: Also restore the descendants removed with it
+                          bind: recursive
+                      actions:
+                        - $type: ButtonSave
+                          label: Restore

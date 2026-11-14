@@ -87,6 +87,8 @@ describe('GET /projects/:ref/related', () => {
       emptyText: '',
       title: 'Tasks',
       countText: '2 recent items',
+      figureText: '2',
+      figureLabel: 'Tasks: recent items',
       noteText: '',
       seeAllText: 'See all',
       href: '/modules/task/tasks?project=shop',

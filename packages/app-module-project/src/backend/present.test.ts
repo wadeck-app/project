@@ -79,12 +79,21 @@ describe('treeRows', () => {
     const b = project(4, { name: 'b', parent: virtualRoot.id });
     const other = project(5, { name: 'other', paths: [{ path: `${base}/other`, main: true }] });
     const { rows, warnings } = treeRows(registryOf(b, a1, other, a, virtualRoot));
+    // The indent is made of non-breaking spaces (U+00A0): a table cell would collapse plain spaces and every level would look alike.
+    const nb = (text: string): string => text.replaceAll(' ', ' ');
     expect(rows.map((r) => [r.name, r.depth, r.treeLabel])).toEqual([
       ['other', 0, 'other'],
       ['base', 0, 'base'],
-      ['b', 1, '  |-- b'],
-      ['a', 1, '  |-- a'],
-      ['a1', 2, '      |-- a1'],
+      ['b', 1, nb('  |-- b')],
+      ['a', 1, nb('  |-- a')],
+      ['a1', 2, nb('      |-- a1')],
+    ]);
+    expect(rows.map((r) => [r.name, r.parentId === '' ? '' : rows.find((p) => p.id === r.parentId)?.name, r.childCount, r.descendantCount])).toEqual([
+      ['other', '', 0, 0],
+      ['base', '', 2, 3],
+      ['b', 'base', 0, 0],
+      ['a', 'base', 1, 1],
+      ['a1', 'a', 0, 0],
     ]);
     expect(rows.find((r) => r.name === 'base')).toMatchObject({ virtual: true, virtualText: 'virtual' });
     expect(rows.find((r) => r.name === 'other')).toMatchObject({ virtual: false, href: `/modules/project/p/${other.id}` });

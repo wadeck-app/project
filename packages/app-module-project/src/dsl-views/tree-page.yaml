@@ -1,37 +1,155 @@
-# Tree (nav /tree): the hierarchy of the projects, children indented under their parent (a virtual project, one without a folder,
-# is marked). TreeView is not used: its selection is a callback, which YAML cannot express, so rows could not navigate; the
-# indentation is drawn by the route (treeLabel). A row opens the detail page. A registry edited by hand (a parent that does not
-# exist, a parent cycle) is shown anyway, with a warning badge.
+# Tree (nav /tree): the hierarchy of the projects, children under their parent (a virtual project, one without a folder,
+# is marked). TreeView is not used: its selection is a callback, which YAML cannot express, so rows could not navigate, and the
+# route answers a flat list in tree order (name, depth), not nested nodes. A row opens the detail page. A registry edited by hand
+# (a parent that does not exist, a parent cycle) is shown anyway, with a warning badge.
+# A/B VARIANTS (dev builds only, floating dock, id tree-layout): the page holds several layouts for the user to choose from;
+# the losing ones get deleted after the choice. "current" is the page as it was before the review.
 $sources:
   tree:
     url: GET /api/modules/project/tree?inlineErrors=true
 
 $type: PageContent
 sections:
-  - $type: PageHeader
-    title: Project tree
-    subtitle: Each project under its parent. Open a project to change it.
-  - $type: Badge
-    $if: $sources.tree.errorText
-    label: $sources.tree.errorText
-    variant: danger
-  - $type: Badge
-    $if: $sources.tree.warningsText
-    label: $sources.tree.warningsText
-    variant: warning
-  - $type: Badge
-    $if: $sources.tree.emptyText
-    label: $sources.tree.emptyText
-    variant: info
-  - $type: DataTable
-    $if: $sources.tree.rows
-    rows: $sources.tree.rows
-    navigateTo: '{href}'
-    emptyMessage: No project
-    columns:
-      - { key: 'treeLabel', label: 'Project', mono: true, nowrap: true }
-      - { key: 'id', label: 'ID', mono: true, nowrap: true }
-      - { key: 'virtualText', label: '', nowrap: true }
-      - { key: 'aliasesText', label: 'Aliases' }
-      - { key: 'labelsText', label: 'Labels' }
-      - { key: 'mainPathText', label: 'Main path', truncate: true, title: '{mainPathText}' }
+  - $type: AbTest
+    id: tree-layout
+    label: Tree layout
+    initial: current
+    variants:
+      current:
+        label: Current
+        hint: The page as it was, the full table with the ID in mono and the path last.
+        view:
+          $type: VerticalStack
+          items:
+            - $type: PageHeader
+              title: Project tree
+              subtitle: Each project under its parent. Open a project to change it.
+            - $type: Badge
+              $if: $sources.tree.errorText
+              label: $sources.tree.errorText
+              variant: danger
+            - $type: Badge
+              $if: $sources.tree.warningsText
+              label: $sources.tree.warningsText
+              variant: warning
+            - $type: Badge
+              $if: $sources.tree.emptyText
+              label: $sources.tree.emptyText
+              variant: info
+            - $type: DataTable
+              $if: $sources.tree.rows
+              rows: $sources.tree.rows
+              navigateTo: '{href}'
+              emptyMessage: No project
+              columns:
+                - { key: 'treeLabel', label: 'Project', mono: true, nowrap: true }
+                - { key: 'id', label: 'ID', mono: true, nowrap: true }
+                - { key: 'virtualText', label: '', nowrap: true }
+                - { key: 'aliasesText', label: 'Aliases' }
+                - { key: 'labelsText', label: 'Labels' }
+                - { key: 'mainPathText', label: 'Main path', truncate: true, title: '{mainPathText}' }
+      outline:
+        label: Outline
+        hint: Compact outline, only the name, a virtual badge and the labels; ID and folder in the tooltip.
+        view:
+          $type: VerticalStack
+          items:
+            - $type: PageHeader
+              title: Project tree
+              subtitle: Each project under its parent. Hover a name for its ID and folder, click it to open the project.
+            - $type: Badge
+              $if: $sources.tree.errorText
+              label: $sources.tree.errorText
+              variant: danger
+            - $type: Badge
+              $if: $sources.tree.warningsText
+              label: $sources.tree.warningsText
+              variant: warning
+            - $type: Badge
+              $if: $sources.tree.emptyText
+              label: $sources.tree.emptyText
+              variant: info
+            - $type: DataTable
+              $if: $sources.tree.rows
+              rows: $sources.tree.rows
+              navigateTo: '{href}'
+              emptyMessage: No project
+              columns:
+                - { key: 'treeLabel', label: 'Project', nowrap: true, title: '{name} - {id} - {mainPathText}' }
+                - { key: 'virtualText', label: '', nowrap: true, badge: { virtual: info } }
+                - { key: 'labelsText', label: 'Labels', muted: true }
+      levels:
+        label: Levels
+        hint: A Level column gives the depth in figures (0 is a root), the name stays plain.
+        view:
+          $type: VerticalStack
+          items:
+            - $type: PageHeader
+              title: Project tree
+              subtitle: Each project under its parent, with its level (0 is a root). Open a project to change it.
+            - $type: Badge
+              $if: $sources.tree.errorText
+              label: $sources.tree.errorText
+              variant: danger
+            - $type: Badge
+              $if: $sources.tree.warningsText
+              label: $sources.tree.warningsText
+              variant: warning
+            - $type: Badge
+              $if: $sources.tree.emptyText
+              label: $sources.tree.emptyText
+              variant: info
+            - $type: DataTable
+              $if: $sources.tree.rows
+              rows: $sources.tree.rows
+              navigateTo: '{href}'
+              emptyMessage: No project
+              columns:
+                - { key: 'depth', label: 'Level', mono: true, muted: true, width: 16 }
+                - { key: 'name', label: 'Project', nowrap: true, title: '{id}' }
+                - { key: 'virtualText', label: '', nowrap: true, badge: { virtual: info } }
+                - { key: 'labelsText', label: 'Labels' }
+                - { key: 'mainPathText', label: 'Main path', truncate: true, muted: true, title: '{mainPathText}' }
+      expand:
+        label: Expandable
+        hint: Two columns; the chevron of a row unfolds its ID, aliases, labels and folder.
+        view:
+          $type: VerticalStack
+          items:
+            - $type: PageHeader
+              title: Project tree
+              subtitle: Each project under its parent. Unfold a row for its details, click it to open the project.
+            - $type: Badge
+              $if: $sources.tree.errorText
+              label: $sources.tree.errorText
+              variant: danger
+            - $type: Badge
+              $if: $sources.tree.warningsText
+              label: $sources.tree.warningsText
+              variant: warning
+            - $type: Badge
+              $if: $sources.tree.emptyText
+              label: $sources.tree.emptyText
+              variant: info
+            - $type: DataTable
+              $if: $sources.tree.rows
+              rows: $sources.tree.rows
+              navigateTo: '{href}'
+              emptyMessage: No project
+              expandLabel: Show details
+              collapseLabel: Hide details
+              columns:
+                - { key: 'treeLabel', label: 'Project', nowrap: true }
+                - { key: 'virtualText', label: '', nowrap: true, badge: { virtual: info } }
+              expansion:
+                $type: VerticalStack
+                gap: gap-1
+                items:
+                  - $type: Markdown
+                    text: "$concat('**ID** ', $ctx.row.id)"
+                  - $type: Markdown
+                    text: "$concat('**Aliases** ', $ctx.row.aliasesText)"
+                  - $type: Markdown
+                    text: "$concat('**Labels** ', $ctx.row.labelsText)"
+                  - $type: Markdown
+                    text: "$concat('**Main path** ', $ctx.row.mainPathText)"

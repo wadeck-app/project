@@ -3,6 +3,8 @@
 # `project list --label` (exact `key::value`, wildcard `state::*`). An invalid selector is answered as data (inlineErrors:
 # `errorText`), shown by a badge, and the page stays: a failing source would blank the whole page.
 # A row opens the detail page of the project (navigateTo, built by the route).
+# A/B: this page holds layout variants (AbTest "projects-layout", dev builds only) for the user to choose from the floating dock.
+# After the choice, the losing variants and the AbTest node are deleted; `current` is the page as it was before the test.
 $sources:
   projects:
     url: GET /api/modules/project/projects
@@ -20,69 +22,432 @@ $actions:
 
 $type: PageContent
 sections:
-  - $type: PageHeader
-    title: Projects
-    subtitle: The projects of the shared registry (the same ones as the `project` command line).
-  - $type: Badge
-    $if: $sources.projects.errorText
-    label: $sources.projects.errorText
-    variant: danger
-  - $type: Badge
-    $if: $sources.projects.emptyText
-    label: $sources.projects.emptyText
-    variant: info
-  - $type: HorizontalStack
-    gap: gap-3
-    align: items-center
-    items:
-      - $type: SearchBar
-        urlParam: label
-        placeholder: "Label selector, e.g. state::* or team::blue"
-      - $type: SearchBar
-        urlParam: q
-        placeholder: Text in the name, alias, id, label or path
-  - $type: DataTable
-    $if: $sources.projects.ready
-    rows: $sources.projects.projects
-    navigateTo: '{href}'
-    emptyMessage: No project matches the filters
-    columns:
-      - { key: 'id', label: 'ID', mono: true, nowrap: true }
-      - { key: 'name', label: 'Name', nowrap: true }
-      - { key: 'aliasesText', label: 'Aliases' }
-      - { key: 'parentName', label: 'Parent', nowrap: true }
-      - { key: 'labelsText', label: 'Labels' }
-      - { key: 'mainPathText', label: 'Main path', truncate: true, title: '{mainPathText}' }
-      - { key: 'virtualText', label: '', nowrap: true }
-  - $type: Collapsible
-    title: Add a project
-    items:
-      - $type: Form
-        $if: $sources.projects.ready
-        onSubmit: $ctx.addProject
-        initialData: {}
-        fields:
-          - $type: FieldText
-            label: Name
-            bind: name
-            required: true
-          - $type: FieldText
-            label: Folder (an existing folder; leave empty for a virtual project)
-            bind: path
-          - $type: FieldText
-            label: Aliases (separated by spaces or commas)
-            bind: aliases
-          - $type: FieldText
-            label: Labels (separated by spaces or commas, e.g. state::production team::blue)
-            bind: labels
-          - $type: FieldSelect
-            label: Parent
-            bind: parent
-            options: $sources.projects.parentOptions
-            placeholder: No parent
-          - $type: FieldText
-            label: Git url
-            bind: git
-        actions:
-          - $type: ButtonSave
-            label: Add the project
+  - $type: AbTest
+    id: projects-layout
+    label: Projects layout
+    initial: current
+    variants:
+      # The page as it was before the test (copy).
+      current:
+        label: Current
+        hint: Today's page - ID first, every column, the add form collapsed at the bottom.
+        view:
+          $type: VerticalStack
+          gap: gap-4
+          items:
+            - $type: PageHeader
+              title: Projects
+              subtitle: The projects of the shared registry (the same ones as the `project` command line).
+            - $type: Badge
+              $if: $sources.projects.errorText
+              label: $sources.projects.errorText
+              variant: danger
+            - $type: Badge
+              $if: $sources.projects.emptyText
+              label: $sources.projects.emptyText
+              variant: info
+            - $type: HorizontalStack
+              gap: gap-3
+              align: items-center
+              items:
+                - $type: SearchBar
+                  urlParam: label
+                  placeholder: "Label selector, e.g. state::* or team::blue"
+                - $type: SearchBar
+                  urlParam: q
+                  placeholder: Text in the name, alias, id, label or path
+            - $type: DataTable
+              $if: $sources.projects.ready
+              rows: $sources.projects.projects
+              navigateTo: '{href}'
+              emptyMessage: No project matches the filters
+              columns:
+                - { key: 'id', label: 'ID', mono: true, nowrap: true }
+                - { key: 'name', label: 'Name', nowrap: true }
+                - { key: 'aliasesText', label: 'Aliases' }
+                - { key: 'parentName', label: 'Parent', nowrap: true }
+                - { key: 'labelsText', label: 'Labels' }
+                - { key: 'mainPathText', label: 'Main path', truncate: true, title: '{mainPathText}' }
+                - { key: 'virtualText', label: '', nowrap: true }
+            - $type: Collapsible
+              title: Add a project
+              items:
+                - $type: Form
+                  $if: $sources.projects.ready
+                  onSubmit: $ctx.addProject
+                  initialData: {}
+                  fields:
+                    - $type: FieldText
+                      label: Name
+                      bind: name
+                      required: true
+                    - $type: FieldText
+                      label: Folder (an existing folder; leave empty for a virtual project)
+                      bind: path
+                    - $type: FieldText
+                      label: Aliases (separated by spaces or commas)
+                      bind: aliases
+                    - $type: FieldText
+                      label: Labels (separated by spaces or commas, e.g. state::production team::blue)
+                      bind: labels
+                    - $type: FieldSelect
+                      label: Parent
+                      bind: parent
+                      options: $sources.projects.parentOptions
+                      placeholder: No parent
+                    - $type: FieldText
+                      label: Git url
+                      bind: git
+                  actions:
+                    - $type: ButtonSave
+                      label: Add the project
+
+      # Name first, noise columns dropped, count next to the filters, the add form folded just under the filters.
+      compact:
+        label: Compact
+        hint: Name first, one toolbar with the count, only the useful columns, the add form folded above the table.
+        view:
+          $type: VerticalStack
+          gap: gap-3
+          items:
+            - $type: PageHeader
+              title: Projects
+              subtitle: The projects of the shared registry (the same ones as the `project` command line).
+              size: sm
+            - $type: Badge
+              $if: $sources.projects.errorText
+              label: $sources.projects.errorText
+              variant: danger
+            - $type: Badge
+              $if: $sources.projects.emptyText
+              label: $sources.projects.emptyText
+              variant: info
+            - $type: HorizontalStack
+              gap: gap-3
+              align: items-center
+              items:
+                - $type: SearchBar
+                  urlParam: label
+                  focusExpand: true
+                  placeholder: "Label, e.g. state::*"
+                - $type: SearchBar
+                  urlParam: q
+                  focusExpand: true
+                  placeholder: Name, alias, id, path
+                - $type: Badge
+                  $if: $sources.projects.ready
+                  label: $concat($sources.projects.count, " of ", $sources.projects.total, " projects")
+                  variant: default
+            - $type: Collapsible
+              title: Add a project
+              items:
+                - $type: Form
+                  $if: $sources.projects.ready
+                  onSubmit: $ctx.addProject
+                  initialData: {}
+                  fields:
+                    - $type: FieldText
+                      label: Name
+                      bind: name
+                      required: true
+                    - $type: FieldText
+                      label: Folder (an existing folder; leave empty for a virtual project)
+                      bind: path
+                    - $type: FieldText
+                      label: Aliases (separated by spaces or commas)
+                      bind: aliases
+                    - $type: FieldText
+                      label: Labels (separated by spaces or commas, e.g. state::production team::blue)
+                      bind: labels
+                    - $type: FieldSelect
+                      label: Parent
+                      bind: parent
+                      options: $sources.projects.parentOptions
+                      placeholder: No parent
+                    - $type: FieldText
+                      label: Git url
+                      bind: git
+                  actions:
+                    - $type: ButtonSave
+                      label: Add the project
+            - $type: DataTable
+              $if: $sources.projects.ready
+              rows: $sources.projects.projects
+              navigateTo: '{href}'
+              emptyMessage: "No project matches the filters: clear the label or the text filter, or add a project."
+              columns:
+                - { key: 'name', label: 'Name', nowrap: true, sortable: true }
+                - { key: 'labelsText', label: 'Labels' }
+                - { key: 'parentName', label: 'Parent', nowrap: true, muted: true }
+                - { key: 'mainPathText', label: 'Path', truncate: true, muted: true, title: '{mainPathText}' }
+                - { key: 'virtualText', label: '', nowrap: true, badge: { virtual: info } }
+                - { key: 'id', label: 'ID', mono: true, muted: true, nowrap: true }
+                - { type: link, to: '{href}', label: Open the project, icon: external-link }
+
+      # Table on the left, the add form always visible on the right.
+      split:
+        label: Split
+        hint: The list on the left, the add form always visible in a card on the right.
+        view:
+          $type: VerticalStack
+          gap: gap-3
+          items:
+            - $type: PageHeader
+              title: Projects
+              subtitle: The projects of the shared registry (the same ones as the `project` command line).
+            - $type: Badge
+              $if: $sources.projects.errorText
+              label: $sources.projects.errorText
+              variant: danger
+            - $type: Badge
+              $if: $sources.projects.emptyText
+              label: $sources.projects.emptyText
+              variant: info
+            - $type: HorizontalStack
+              gap: gap-6
+              align: items-start
+              itemSizes: [flex, fixed]
+              items:
+                - $type: VerticalStack
+                  gap: gap-3
+                  items:
+                    - $type: HorizontalStack
+                      gap: gap-3
+                      align: items-center
+                      items:
+                        - $type: SearchBar
+                          urlParam: label
+                          focusExpand: true
+                          placeholder: "Label, e.g. state::*"
+                        - $type: SearchBar
+                          urlParam: q
+                          focusExpand: true
+                          placeholder: Name, alias, id, path
+                        - $type: Badge
+                          $if: $sources.projects.ready
+                          label: $concat($sources.projects.count, " of ", $sources.projects.total)
+                          variant: default
+                    - $type: DataTable
+                      $if: $sources.projects.ready
+                      rows: $sources.projects.projects
+                      navigateTo: '{href}'
+                      emptyMessage: "No project matches the filters: clear the label or the text filter, or add a project."
+                      columns:
+                        - { key: 'name', label: 'Name', nowrap: true, sortable: true }
+                        - { key: 'labelsText', label: 'Labels' }
+                        - { key: 'mainPathText', label: 'Path', truncate: true, muted: true, title: '{mainPathText}' }
+                        - { key: 'virtualText', label: '', nowrap: true, badge: { virtual: info } }
+                - $type: Card
+                  padding: lg
+                  items:
+                    - $type: Section
+                      title: Add a project
+                      items:
+                        - $type: Form
+                          $if: $sources.projects.ready
+                          onSubmit: $ctx.addProject
+                          initialData: {}
+                          fields:
+                            - $type: FieldText
+                              label: Name
+                              bind: name
+                              required: true
+                            - $type: FieldText
+                              label: Folder (an existing folder; leave empty for a virtual project)
+                              bind: path
+                            - $type: FieldText
+                              label: Aliases (separated by spaces or commas)
+                              bind: aliases
+                            - $type: FieldText
+                              label: Labels (separated by spaces or commas, e.g. state::production team::blue)
+                              bind: labels
+                            - $type: FieldSelect
+                              label: Parent
+                              bind: parent
+                              options: $sources.projects.parentOptions
+                              placeholder: No parent
+                            - $type: FieldText
+                              label: Git url
+                              bind: git
+                          actions:
+                            - $type: ButtonSave
+                              label: Add the project
+
+      # Two tabs, kept in the URL (?tab=): browsing is the default, adding is a tab of its own.
+      tabs:
+        label: Tabs
+        hint: Two tabs - the list (default) and a dedicated "Add a project" tab; the tab is kept in the URL.
+        view:
+          $type: VerticalStack
+          gap: gap-3
+          items:
+            - $type: PageHeader
+              title: Projects
+              subtitle: The projects of the shared registry (the same ones as the `project` command line).
+            - $type: Badge
+              $if: $sources.projects.errorText
+              label: $sources.projects.errorText
+              variant: danger
+            - $type: Badge
+              $if: $sources.projects.emptyText
+              label: $sources.projects.emptyText
+              variant: info
+            - $type: PageTabs
+              urlParam: tab
+              tabs:
+                - id: list
+                  label: Projects
+                  children:
+                    - $type: HorizontalStack
+                      gap: gap-3
+                      align: items-center
+                      items:
+                        - $type: SearchBar
+                          urlParam: label
+                          focusExpand: true
+                          placeholder: "Label, e.g. state::*"
+                        - $type: SearchBar
+                          urlParam: q
+                          focusExpand: true
+                          placeholder: Name, alias, id, path
+                        - $type: Badge
+                          $if: $sources.projects.ready
+                          label: $concat($sources.projects.count, " of ", $sources.projects.total, " projects")
+                          variant: default
+                    - $type: DataTable
+                      $if: $sources.projects.ready
+                      rows: $sources.projects.projects
+                      navigateTo: '{href}'
+                      emptyMessage: "No project matches the filters: clear the label or the text filter, or use the Add a project tab."
+                      columns:
+                        - { key: 'name', label: 'Name', nowrap: true, sortable: true }
+                        - { key: 'aliasesText', label: 'Aliases' }
+                        - { key: 'parentName', label: 'Parent', nowrap: true }
+                        - { key: 'labelsText', label: 'Labels' }
+                        - { key: 'mainPathText', label: 'Path', truncate: true, muted: true, title: '{mainPathText}' }
+                        - { key: 'virtualText', label: '', nowrap: true, badge: { virtual: info } }
+                - id: add
+                  label: Add a project
+                  children:
+                    - $type: Form
+                      $if: $sources.projects.ready
+                      onSubmit: $ctx.addProject
+                      initialData: {}
+                      fields:
+                        - $type: FieldText
+                          label: Name
+                          bind: name
+                          required: true
+                        - $type: FieldText
+                          label: Folder (an existing folder; leave empty for a virtual project)
+                          bind: path
+                        - $type: FieldText
+                          label: Aliases (separated by spaces or commas)
+                          bind: aliases
+                        - $type: FieldText
+                          label: Labels (separated by spaces or commas, e.g. state::production team::blue)
+                          bind: labels
+                        - $type: FieldSelect
+                          label: Parent
+                          bind: parent
+                          options: $sources.projects.parentOptions
+                          placeholder: No parent
+                        - $type: FieldText
+                          label: Git url
+                          bind: git
+                      actions:
+                        - $type: ButtonSave
+                          label: Add the project
+
+      # Figures first, then the table; the add form is an open section under the table.
+      overview:
+        label: Overview
+        hint: Two figures on top (shown / in the registry, the second clears the filters), the list, then the add form open below.
+        view:
+          $type: VerticalStack
+          gap: gap-4
+          items:
+            - $type: PageHeader
+              title: Projects
+              subtitle: The projects of the shared registry (the same ones as the `project` command line).
+            - $type: Badge
+              $if: $sources.projects.errorText
+              label: $sources.projects.errorText
+              variant: danger
+            - $type: Badge
+              $if: $sources.projects.emptyText
+              label: $sources.projects.emptyText
+              variant: info
+            - $type: HorizontalStack
+              gap: gap-3
+              align: items-stretch
+              items:
+                - $type: StatTile
+                  label: Shown
+                  value: $sources.projects.count
+                  compact: true
+                - $type: StatTile
+                  label: In the registry (show all)
+                  value: $sources.projects.total
+                  href: /modules/project/
+                  compact: true
+            - $type: Section
+              title: Find a project
+              items:
+                - $type: HorizontalStack
+                  gap: gap-3
+                  align: items-center
+                  items:
+                    - $type: SearchBar
+                      urlParam: label
+                      focusExpand: true
+                      placeholder: "Label, e.g. state::*"
+                    - $type: SearchBar
+                      urlParam: q
+                      focusExpand: true
+                      placeholder: Name, alias, id, path
+                - $type: DataTable
+                  $if: $sources.projects.ready
+                  rows: $sources.projects.projects
+                  navigateTo: '{href}'
+                  emptyMessage: "No project matches the filters: clear the label or the text filter, or add a project below."
+                  columns:
+                    - { key: 'name', label: 'Name', nowrap: true, sortable: true }
+                    - { key: 'aliasesText', label: 'Aliases' }
+                    - { key: 'parentName', label: 'Parent', nowrap: true }
+                    - { key: 'labelsText', label: 'Labels' }
+                    - { key: 'mainPathText', label: 'Path', truncate: true, muted: true, title: '{mainPathText}' }
+                    - { key: 'virtualText', label: '', nowrap: true, badge: { virtual: info } }
+                    - { type: link, to: '{href}', label: Open the project, icon: external-link }
+            - $type: Section
+              title: Add a project
+              items:
+                - $type: Form
+                  $if: $sources.projects.ready
+                  onSubmit: $ctx.addProject
+                  initialData: {}
+                  fields:
+                    - $type: FieldText
+                      label: Name
+                      bind: name
+                      required: true
+                    - $type: FieldText
+                      label: Folder (an existing folder; leave empty for a virtual project)
+                      bind: path
+                    - $type: FieldText
+                      label: Aliases (separated by spaces or commas)
+                      bind: aliases
+                    - $type: FieldText
+                      label: Labels (separated by spaces or commas, e.g. state::production team::blue)
+                      bind: labels
+                    - $type: FieldSelect
+                      label: Parent
+                      bind: parent
+                      options: $sources.projects.parentOptions
+                      placeholder: No parent
+                    - $type: FieldText
+                      label: Git url
+                      bind: git
+                  actions:
+                    - $type: ButtonSave
+                      label: Add the project
