@@ -3,7 +3,7 @@
 # "Also restore the descendants" on the parent); the refusal is shown as a toast with the server message.
 # A/B VARIANTS (AbTest "trash-layout", dev builds only): the user picks one in the floating dock, the others are deleted afterwards.
 # The variants with a Restore button per row run restoreProject with the ref of the row (a row action sends no body: the descendants stay in the form).
-# KNOWN (seen in a browser): a row action sends no Content-Type, so the write guard answers 415 until the shell sends JSON (asked to app-core-owner); the form buttons work.
+# Needs app-core-cli >= 2026.11.19-206: the shell sends {} as JSON on a row action (before, the write guard answered 415). Checked in a browser.
 $sources:
   deleted:
     url: GET /api/modules/project/deleted?inlineErrors=true
