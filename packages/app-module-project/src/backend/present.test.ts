@@ -61,7 +61,7 @@ describe('projectRow', () => {
 describe('deletedRow', () => {
   it('is a row with the date of the deletion and a way to restore it', () => {
     const gone = { ...project(5, { name: 'gone', aliases: ['g'] }), deletedAt: '2026-10-30T10:00:00.000Z' };
-    expect(deletedRow(gone, [gone])).toMatchObject({ id: gone.id, name: 'gone', aliasesText: 'g', deletedAt: '2026-10-30T10:00:00.000Z', hasDeletedParent: false });
+    expect(deletedRow(gone, [gone])).toMatchObject({ id: gone.id, name: 'gone', aliasesText: 'g', deletedAt: '2026-10-30T10:00:00.000Z', hasDeletedParent: false, ref: gone.id });
   });
 
   it('says when the parent is deleted too, because the restore then needs the parent first', () => {

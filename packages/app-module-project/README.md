@@ -27,6 +27,7 @@ Base `/api/modules/project`. Bodies are JSON objects; an unknown field is a 400.
 | `GET /projects/:ref` | detail, with `options` and `forms` for the page |
 | `GET /projects/:ref/related` | see Related |
 | `GET /tree`, `GET /deleted` | |
+| `GET /health` | update test of app-core-cli, read-only: `registry` parses and is consistent, `trash` parses, `folders` = one data folder per project. `{ ok, checks[] }` |
 | `POST /projects` | `name`, `path?`, `aliases?`, `labels?`, `parent?`, `git?`, `virtual?` (201) |
 | `PUT /projects/:ref/name` | `name` |
 | `PUT /projects/:ref/slug` | `slug`; **moves the project folder** (400 invalid slug, 409 two folders for the project or the OS refuses the move because a tool holds it, nothing changed) |

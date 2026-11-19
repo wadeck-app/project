@@ -42,6 +42,7 @@ describe('route list', () => {
         'PUT /projects/:ref/paths',
         'PUT /projects/:ref/main',
         'GET /tree',
+        'GET /health',
         'GET /deleted',
         'POST /deleted/:ref/restore',
       ].sort(),

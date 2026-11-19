@@ -1,5 +1,6 @@
 // violations-suppress: ts/no-barrel-index app-core requires the backend entry of an app-module to be src/backend/index.ts (app-core-cli check)
 import type { ModuleContext } from '@wadeck-app/app-core-sdk';
+import { registerHealthRoute } from './health.js';
 import { registerReadRoutes } from './readRoutes.js';
 import { registerRelatedRoute } from './relatedRoute.js';
 import { createRouteKit } from './routeKit.js';
@@ -14,4 +15,5 @@ export default function (ctx: ModuleContext): void {
   registerReadRoutes(kit);
   registerWriteRoutes(kit);
   registerRelatedRoute(kit);
+  registerHealthRoute(kit);
 }

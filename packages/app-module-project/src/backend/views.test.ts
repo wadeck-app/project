@@ -278,3 +278,20 @@ describe('dsl-views', () => {
     expect(page.match(/\$type: ExtensionSlot/g)).toHaveLength(2);
   });
 });
+
+// Seen in a browser (isolated app-core, removed projects): the form sent {id} and the route refused "unknown field 'id'; the accepted fields are: ref, recursive".
+// A row action takes the placeholder from the row, a form from the field it binds: both must be `ref`, the field the restore route accepts.
+describe('trash page: the restore action matches the route', () => {
+  const page = parseView('deleted-page.yaml');
+
+  it('puts {ref} in the url and every form that submits it binds `ref` (the body field of POST /deleted/:ref/restore)', () => {
+    const action = (page['$actions'] as Record<string, { url: string }>)['restoreProject']!;
+    expect(action.url).toBe('POST /api/modules/project/deleted/{ref}/restore');
+    const forms = findForms(page).filter((f) => f['onSubmit'] === '$ctx.restoreProject');
+    expect(forms.length).toBeGreaterThan(0);
+    for (const form of forms) {
+      const binds = ((form['fields'] ?? []) as { bind?: string }[]).map((f) => f.bind).filter((b) => b !== 'recursive');
+      expect(binds).toEqual(['ref']);
+    }
+  });
+});

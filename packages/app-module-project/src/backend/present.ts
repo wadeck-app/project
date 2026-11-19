@@ -68,12 +68,14 @@ export interface DeletedRow extends Omit<ProjectRow, 'href'> {
   deletedAt: string;
   /** The parent was deleted too: restoring this project needs the parent first (or both at once). */
   hasDeletedParent: boolean;
+  /** The id again, under the name of the restore route's field: a row action fills {ref} of its url from the row. */
+  ref: string;
 }
 
 /** A removed project as a row of the trash. `live` only names a parent that is still alive. */
 export function deletedRow(entry: DeletedProject, deleted: readonly DeletedProject[], live: readonly Project[] = []): DeletedRow {
   const { href: _href, ...row } = projectRow(entry, { schemaVersion: 1, projects: [...deleted, ...live] });
-  return { ...row, deletedAt: entry.deletedAt, hasDeletedParent: entry.parent !== undefined && deleted.some((p) => p.id === entry.parent) };
+  return { ...row, ref: entry.id, deletedAt: entry.deletedAt, hasDeletedParent: entry.parent !== undefined && deleted.some((p) => p.id === entry.parent) };
 }
 
 export interface TreeRow {
