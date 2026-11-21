@@ -7,7 +7,7 @@ import { NegativeCache, collectRelated } from './related.js';
 const panel = (title: string, extra: object = {}) => ({ title, count: 1, items: [{ label: 'one', url: '/modules/x/one' }], ...extra });
 
 describe('collectRelated', () => {
-  it('asks every other module about the project and returns the panels sorted by module id, with the fields of the contract', async () => {
+  it('asks the other modules that depend on project and returns the panels sorted by module id, with the fields of the contract', async () => {
     const app = await fakeAppCore(['task', 'project', 'queue'], {
       task: (_req, res) => json(res, 200, panel('Tasks', { count: 12, items: [{ label: 'Fix it', url: '/modules/task/tasks/a', subtitle: 'open' }], moreUrl: '/modules/task/tasks?project=shop', extra: 'dropped' })),
       queue: (_req, res) => json(res, 200, panel('Queues')),
@@ -213,5 +213,38 @@ describe('collectRelated: the negative cache', () => {
     await collectRelated('0000abcd', { baseUrl: app.baseUrl });
     await collectRelated('0000abcd', { baseUrl: app.baseUrl });
     expect(app.calls).toHaveLength(2);
+  });
+});
+
+// Seen in a browser: the project page asked EVERY installed module and listed "agent-manager, health, machine, orchestrator, school: did not answer
+// within 2000 ms" (modules that have nothing to do with a project). The direction is the optional dependency: a module is asked when it declares
+// project in its `requires` or `optionalRequires`, or when project itself depends on it (`alsoAsk`: its own optionalRequires).
+describe('collectRelated: only the modules that depend on project, or that project depends on', () => {
+  const answers = (title: string): Behavior => (_req, res) => json(res, 200, { title, count: 1, items: [] });
+
+  it('does not ask a module that declares nothing about project (no request, so no timeout and no warning)', async () => {
+    const app = await fakeAppCore(['task', { id: 'health' }, { id: 'machine', optionalRequires: { flow: '*' } }], { task: answers('Tasks'), health: answers('Health'), machine: answers('Machine') });
+    const panels = await collectRelated('0000abcd', { baseUrl: app.baseUrl });
+    expect(panels.map((p) => p.module)).toEqual(['task']);
+    expect(app.calls).toEqual(['task:0000abcd']);
+  });
+
+  it('asks a module that requires project, and one that optionally requires it', async () => {
+    const app = await fakeAppCore([{ id: 'hard', requires: { project: '*' } }, { id: 'soft', optionalRequires: { project: '*' } }, { id: 'other' }], { hard: answers('Hard'), soft: answers('Soft'), other: answers('Other') });
+    const panels = await collectRelated('0000abcd', { baseUrl: app.baseUrl });
+    expect(panels.map((p) => p.module)).toEqual(['hard', 'soft']);
+  });
+
+  it('asks the modules project depends on (alsoAsk) even when they declare nothing about project', async () => {
+    const app = await fakeAppCore([{ id: 'queue' }, { id: 'flow' }, { id: 'health' }], { queue: answers('Queue'), flow: answers('Flows'), health: answers('Health') });
+    const panels = await collectRelated('0000abcd', { baseUrl: app.baseUrl, alsoAsk: ['queue', 'flow', 'task'] });
+    expect(panels.map((p) => p.module)).toEqual(['flow', 'queue']);
+    expect(app.calls.sort()).toEqual(['flow:0000abcd', 'queue:0000abcd']);
+  });
+
+  it('never asks itself, even when it declares project', async () => {
+    const app = await fakeAppCore([{ id: 'project', optionalRequires: { project: '*' } }], {});
+    expect(await collectRelated('0000abcd', { baseUrl: app.baseUrl })).toEqual([]);
+    expect(app.calls).toEqual([]);
   });
 });

@@ -121,7 +121,7 @@ In the Related table each panel has a **See all** link (column `seeAllText`) to 
 
 A `count` without a `countLabel` is **never displayed**, even when it equals the number of items: flow and queue send what needs attention as `count` and recent history as `items`, so a bare number next to a list is ambiguous. `countLabel` stays optional in the SDK contract.
 
-The 60 s memory is in the process, keyed by module id and project id. `GET /projects/:ref/related` asks every other installed module in parallel (the list comes from `GET /api/modules` of the same server, on `APP_CORE_PORT`, else the port app-core wrote, else 4850). It answers `{ projectId, hasPanels, panels, summary, rows, warnings, emptyText? }`; `panels` is sorted by module id and `warnings` entries are `{ module, text }`, never hidden.
+The 60 s memory is in the process, keyed by module id and project id. `GET /projects/:ref/related` asks in parallel only the installed modules that declare `project` in their `requires` or `optionalRequires`, plus the ones this module depends on (its own `optionalRequires`: task, queue, flow); a module that declares nothing is never asked, so it cannot time out on the page (the list comes from `GET /api/modules` of the same server, on `APP_CORE_PORT`, else the port app-core wrote, else 4850). It answers `{ projectId, hasPanels, panels, summary, rows, warnings, emptyText? }`; `panels` is sorted by module id and `warnings` entries are `{ module, text }`, never hidden.
 
 ## Verified and not verified
 

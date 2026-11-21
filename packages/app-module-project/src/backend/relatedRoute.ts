@@ -28,7 +28,7 @@ export function registerRelatedRoute(kit: RouteKit): void {
   kit.route('GET', '/projects/:ref/related', async (req) => {
     const registryDir = defaultRegistryDir(process.env);
     const project = findLive(registryDir, loadRegistry(registryDir), refOf(req));
-    const all = await collectRelated(project.id, { baseUrl: baseUrl(), cache: negativeCache });
+    const all = await collectRelated(project.id, { baseUrl: baseUrl(), cache: negativeCache, alsoAsk: TOOL_MODULES });
     const panels = all.filter((p) => p.error === undefined);
     const warnings = all.filter((p) => p.error !== undefined).map((p) => ({ module: p.module, text: `${p.module}: ${p.error}` }));
     return ok({

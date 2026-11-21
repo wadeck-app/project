@@ -49,6 +49,8 @@ export interface RelatedOptions {
   baseUrl: string;
   /** Time given to each module to answer. Default 2000. */
   timeoutMs?: number;
+  /** Modules this module depends on (its own optionalRequires): asked even when they declare nothing about project. */
+  alsoAsk?: readonly string[];
   /** When given, modules that answered 404 or 409 are not asked again for 60 s. */
   cache?: NegativeCache;
 }
@@ -71,7 +73,7 @@ async function readJson(response: Response): Promise<unknown> {
  * The entry of one module, or undefined when it has nothing to say: 404 (no such route) or 409 (not applicable to this project).
  * A failure is an entry with `error`: it never throws.
  */
-async function ask(module: string, projectId: string, options: Required<Omit<RelatedOptions, 'cache'>> & Pick<RelatedOptions, 'cache'>): Promise<RelatedEntry | undefined> {
+async function ask(module: string, projectId: string, options: Required<Omit<RelatedOptions, 'cache' | 'alsoAsk'>> & Pick<RelatedOptions, 'cache'>): Promise<RelatedEntry | undefined> {
   if (options.cache?.has(module, projectId) === true) {
     return undefined;
   }
@@ -97,7 +99,8 @@ async function ask(module: string, projectId: string, options: Required<Omit<Rel
   }
 }
 
-async function installedModules(options: { baseUrl: string; timeoutMs: number }): Promise<string[]> {
+/** The installed modules with what they declare about project: `dependsOnProject` when project is in their requires or optionalRequires. */
+async function installedModules(options: { baseUrl: string; timeoutMs: number }): Promise<{ id: string; dependsOnProject: boolean }[]> {
   try {
     const response = await fetch(`${options.baseUrl}/api/modules`, { signal: AbortSignal.timeout(options.timeoutMs) });
     if (!response.ok) {
@@ -108,20 +111,33 @@ async function installedModules(options: { baseUrl: string; timeoutMs: number })
     if (!Array.isArray(modules)) {
       throw new Error('the answer has no list of modules');
     }
-    return modules.flatMap((entry) => (typeof entry === 'object' && entry !== null && typeof (entry as { id?: unknown }).id === 'string' ? [(entry as { id: string }).id] : []));
+    const declares = (value: unknown): boolean => typeof value === 'object' && value !== null && Object.hasOwn(value, 'project');
+    return modules.flatMap((entry) => {
+      if (typeof entry !== 'object' || entry === null || typeof (entry as { id?: unknown }).id !== 'string') {
+        return [];
+      }
+      const { id, requires, optionalRequires } = entry as { id: string; requires?: unknown; optionalRequires?: unknown };
+      return [{ id, dependsOnProject: declares(requires) || declares(optionalRequires) }];
+    });
   } catch (error) {
     throw new RequestError(502, `cannot reach app-core at ${options.baseUrl} to list the installed modules (${reasonOf(error)})`, 'Check that app-core is running, and APP_CORE_PORT if it is set.');
   }
 }
 
 /**
- * The entries the other modules contribute for a project: asks every installed module except this one, in parallel,
+ * The entries the other modules contribute for a project: asks, in parallel, the installed modules that depend on project (requires or
+ * optionalRequires) or that this module depends on (alsoAsk), never this one,
  * GET /api/modules/<id>/related/project/<projectId> (the contract is parseRelatedResponse of @wadeck-app/project-sdk).
  * Sorted by module id.
  */
 export async function collectRelated(projectId: string, options: RelatedOptions): Promise<RelatedEntry[]> {
   const resolved = { baseUrl: options.baseUrl, timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS, cache: options.cache };
-  const modules = (await installedModules(resolved)).filter((id) => id !== SELF).sort();
+  // A module is asked when it declares project in requires/optionalRequires, or when this module depends on it (alsoAsk): the others have nothing to do with a project.
+  const wanted = new Set(options.alsoAsk ?? []);
+  const modules = (await installedModules(resolved))
+    .filter((m) => m.id !== SELF && (m.dependsOnProject || wanted.has(m.id)))
+    .map((m) => m.id)
+    .sort();
   const entries = await Promise.all(modules.map((module) => ask(module, projectId, resolved)));
   return entries.filter((entry): entry is RelatedEntry => entry !== undefined);
 }

@@ -20,13 +20,22 @@ export const json = (res: ServerResponse, status: number, body: unknown): void =
   res.end(JSON.stringify(body));
 };
 
-/** A fake app-core: `modules` are the installed ids, `behaviors[id]` answers GET /api/modules/<id>/related/project/<projectId>. */
-export async function fakeAppCore(modules: string[], behaviors: Record<string, Behavior>): Promise<Fake> {
+/**
+ * A fake app-core: `modules` are the installed modules, `behaviors[id]` answers GET /api/modules/<id>/related/project/<projectId>.
+ * A string is a module that declares an optional dependency on project (what a module that contributes to the project page does); an object says
+ * exactly what the module declares in its manifest (requires, optionalRequires).
+ */
+export type FakeModule = string | { id: string; requires?: Record<string, string>; optionalRequires?: Record<string, string> };
+
+export async function fakeAppCore(modules: FakeModule[], behaviors: Record<string, Behavior>): Promise<Fake> {
   const calls: string[] = [];
   const server = createServer((req, res) => {
     const url = req.url ?? '';
     if (url === '/api/modules') {
-      return json(res, 200, { modules: modules.map((id) => ({ id, version: '1.0.0' })), failed: [] });
+      return json(res, 200, {
+        modules: modules.map((m) => (typeof m === 'string' ? { id: m, version: '1.0.0', requires: {}, optionalRequires: { project: '*' } } : { version: '1.0.0', requires: {}, optionalRequires: {}, ...m })),
+        failed: [],
+      });
     }
     const match = /^\/api\/modules\/([^/]+)\/related\/project\/([^/]+)$/.exec(url);
     const behavior = match === null ? undefined : behaviors[match[1]!];
