@@ -48,13 +48,13 @@ function collect(node: unknown, key: string, found: unknown[] = []): unknown[] {
   return found;
 }
 
-/** Every Form node, at any depth. */
+/** Every Form and DialogForm node, at any depth. */
 function findForms(node: unknown, found: Record<string, unknown>[] = []): Record<string, unknown>[] {
   if (Array.isArray(node)) {
     node.forEach((child) => findForms(child, found));
   } else if (node !== null && typeof node === 'object') {
     const record = node as Record<string, unknown>;
-    if (record['$type'] === 'Form') {
+    if (record['$type'] === 'Form' || record['$type'] === 'DialogForm') {
       found.push(record);
     }
     Object.values(record).forEach((child) => findForms(child, found));
@@ -84,12 +84,12 @@ describe('manifest.json', () => {
     }
   });
 
-  it('declares the pages: Projects (/), Tree, Trash in the menu and /p/:project for the detail', () => {
+  it('declares the pages: Projects (/projects), Tree, Trash in the menu and /projects/:project for the detail', () => {
     expect(manifest.extensionPoints.filter((p) => p.kind === 'page').map((p) => `${p.kind}:${p.slot}:${p.path}:${p.label}`)).toEqual([
-      'page:nav:/:Projects',
+      'page:nav:/projects:Projects',
       'page:nav:/tree:Tree',
       'page:nav:/deleted:Trash',
-      'page:route:/p/:project:Project',
+      'page:route:/projects/:project:Project',
     ]);
   });
 
@@ -144,9 +144,9 @@ describe('dsl-views', () => {
 
   const routes = makeModule().routes;
   const urlsOf = (file: string, key: '$sources' | '$actions'): { name: string; method: string; path: string; url: string }[] => {
-    const block = (parseView(file)[key] ?? {}) as Record<string, { url: string }>;
-    return Object.entries(block).map(([name, spec]) => {
-      const [method = '', rest = ''] = spec.url.split(' ');
+    const block = (parseView(file)[key] ?? {}) as Record<string, { url?: string }>;
+    return Object.entries(block).filter(([, spec]) => spec.url !== undefined).map(([name, spec]) => {
+      const [method = '', rest = ''] = spec.url!.split(' ');
       return { name, method, path: rest.replace(/^\/api\/modules\/project/, '').split('?')[0]!, url: rest };
     });
   };
@@ -179,12 +179,12 @@ describe('dsl-views', () => {
   it.each(viewFiles)('%s: every action used by a form is declared, and every declared action is used', (file) => {
     const document = parseView(file);
     const declared = Object.keys((document['$actions'] ?? {}) as object);
-    const used = (collect(document, 'onSubmit') as string[]).map((value) => value.replace('$ctx.', ''));
+    const used = [...(collect(document, 'onSubmit') as string[]), ...(collect(document, 'onClick') as string[]), ...(collect(document, 'onClose') as string[])].map((value) => value.replace('$ctx.', ''));
     expect([...new Set(used)].sort()).toEqual([...declared].sort());
   });
 
   it.each(viewFiles)('%s: an action that deletes or clears asks for a confirmation, and every action says its success and its failure', (file) => {
-    const actions = (parseView(file)['$actions'] ?? {}) as Record<string, { url: string; confirm?: string; successMessage?: string; errorPrefix?: string }>;
+    const actions = Object.fromEntries(Object.entries((parseView(file)['$actions'] ?? {}) as Record<string, { url?: string; confirm?: string; successMessage?: string; errorPrefix?: string }>).filter(([, a]) => a.url !== undefined)) as Record<string, { url: string; confirm?: string; successMessage?: string; errorPrefix?: string }>;
     for (const [name, action] of Object.entries(actions)) {
       expect(action.successMessage, `${file} ${name} successMessage`).toEqual(expect.any(String));
       expect(action.errorPrefix, `${file} ${name} errorPrefix`).toEqual(expect.any(String));
@@ -240,9 +240,10 @@ describe('dsl-views', () => {
 
   it('every layout variant keeps every action of the page, both slots and the removal switch', () => {
     const { variants } = abVariants();
-    expect(Object.keys(variants).length).toBeGreaterThanOrEqual(4);
-    const page = parseView('project-page.yaml') as { $actions: Record<string, unknown> };
-    const actions = Object.keys(page.$actions).sort();
+    expect(Object.keys(variants).length).toBeGreaterThanOrEqual(3);
+    const page = parseView('project-page.yaml') as { $actions: Record<string, { url?: string }> };
+    // The actions that call a route; the ones that only open a popup are checked in the popups test below.
+    const actions = Object.entries(page.$actions).filter(([, a]) => a.url !== undefined).map(([name]) => name).sort();
     const submitted = (view: unknown): string[] => [...new Set(findForms(view).map((f) => String(f['onSubmit']).replace('$ctx.', '')))].sort();
     for (const [id, variant] of Object.entries(variants)) {
       expect(variant.label, id).toBeTruthy();
@@ -292,6 +293,51 @@ describe('trash page: the restore action matches the route', () => {
     for (const form of forms) {
       const binds = ((form['fields'] ?? []) as { bind?: string }[]).map((f) => f.bind).filter((b) => b !== 'recursive');
       expect(binds).toEqual(['ref']);
+    }
+  });
+});
+
+// Round 2 of the detail page: every change is a popup. A popup opens when its button runs an action with a `resultKey` and no url; the DialogForm
+// has `visible: $<resultKey>`. A button without its dialog (or the reverse) opens nothing and says nothing.
+describe('detail page: popups are wired from a button to a DialogForm', () => {
+  const page = parseView('project-page.yaml') as { $actions: Record<string, { url?: string; resultKey?: string; clear?: boolean }>; sections: { variants: Record<string, { view: unknown }> }[] };
+  const openActions = Object.entries(page.$actions).filter(([, a]) => a.url === undefined && a.clear !== true);
+  const variantsWithDialogs = Object.entries(page.sections[0]!.variants).filter(([, v]) => findNodes(v.view, 'DialogForm').length > 0);
+
+  it('has at least two variants with popups, and every action without a url has a resultKey', () => {
+    expect(variantsWithDialogs.length).toBeGreaterThanOrEqual(2);
+    for (const [name, action] of openActions) {
+      expect(action.resultKey, name).toEqual(expect.any(String));
+    }
+  });
+
+  it.each(variantsWithDialogs.map(([id]) => id))('%s: every open button has its dialog, every dialog has a button, once each', (id) => {
+    const view = page.sections[0]!.variants[id]!.view;
+    const visibles = findNodes(view, 'DialogForm').map((d) => String(d['visible']).replace(/^\$/, ''));
+    expect(new Set(visibles).size, 'two dialogs share a visible key').toBe(visibles.length);
+    const keys = openActions.map(([, a]) => a.resultKey!);
+    expect([...visibles].sort()).toEqual([...keys].sort());
+    const clicked = (collect(view, 'onClick') as string[]).map((v) => v.replace('$ctx.', ''));
+    for (const [name] of openActions) {
+      expect(clicked, `no button runs ${name}`).toContain(name);
+    }
+  });
+});
+
+// A popup that opens and cannot close was seen in a browser (a DialogForm without onClose stays open after Cancel, the X and a successful Save).
+describe('detail page: every popup closes', () => {
+  const page = parseView('project-page.yaml') as { $actions: Record<string, { url?: string; resultKey?: string; clear?: boolean }>; sections: { variants: Record<string, { view: unknown }> }[] };
+
+  it('every dialog has an onClose that runs an action which clears the very key of its `visible`', () => {
+    const dialogs = Object.values(page.sections[0]!.variants).flatMap((v) => findNodes(v.view, 'DialogForm'));
+    expect(dialogs.length).toBeGreaterThan(0);
+    for (const dialog of dialogs) {
+      const name = String(dialog['onClose']).replace('$ctx.', '');
+      const action = page.$actions[name];
+      expect(action, `${String(dialog['title'])}: onClose ${String(dialog['onClose'])} is not a declared action`).toBeDefined();
+      expect(action!.clear, `${name} must clear`).toBe(true);
+      expect(action!.url, `${name} must have no url`).toBeUndefined();
+      expect(`$${action!.resultKey}`, `${name} must clear the key the dialog shows`).toBe(String(dialog['visible']));
     }
   });
 });

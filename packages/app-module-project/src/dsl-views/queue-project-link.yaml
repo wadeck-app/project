@@ -5,4 +5,4 @@ size: sm
 variant: secondary
 $if: $sources.projectScope.found
 label: $sources.projectScope.name
-to: "$concat('/modules/project/p/', $sources.projectScope.id)"
+to: "$concat('/modules/project/projects/', $sources.projectScope.id)"

@@ -10,10 +10,10 @@ Scripts: `npm run check` (layout and manifest), `BUNDLE_VERSION=<v> npm run bund
 
 | Menu | Path | Content |
 |---|---|---|
-| Projects | `/` | Table (id, name, aliases, parent, labels, main path, virtual marker), label-selector filter, text filter, add form |
+| Projects | `/projects` | Table (id, name, aliases, parent, labels, main path, virtual marker), label-selector filter, text filter, add form |
 | Tree | `/tree` | Hierarchy, children indented under their parent |
 | Trash | `/deleted` | Removed projects, restore form |
-| (route) | `/p/:project` | Detail of one project (`:project` = id, name or alias) and all its changes |
+| (route) | `/projects/:project` | Detail of one project (`:project` = id, name or alias) and all its changes |
 
 The label filter takes the syntax of `project list --label` (`key::value`, wildcard `state::*`); an invalid selector is shown on the page. The page UI takes one selector; the API accepts several.
 
@@ -60,7 +60,7 @@ A client that is not a browser sends no `Origin` and passes if it sends the othe
 
 ### Layout of the project page
 
-`/p/:project` is organised in tabs (`PageTabs`, the selected one is the URL parameter `tab`, so a tab can be linked and survives a reload): **Overview** (a table with what each module counts for the project, the modules that could not answer, then the `project:project-panels` slot), **Tasks**, **Flows**, **Queue** (what that module says about the project, from the `related` route: `tabs.<module>` of the response, with the reason when a module has nothing or did not answer), **Settings** (identity with the folder name (slug) form, hierarchy, folders, removal). The tool tabs are fixed (task, flow, queue: the `optionalRequires`); a module outside that list appears only in the overview table and the slot. The statistics are the counts the modules send (`count` + `countLabel`, shown as `countText`): they have different units, so there is no chart; per-state or over-time figures need a contract extension on the `related` response.
+`/projects/:project` is organised in tabs (`PageTabs`, the selected one is the URL parameter `tab`, so a tab can be linked and survives a reload): **Overview** (a table with what each module counts for the project, the modules that could not answer, then the `project:project-panels` slot), **Tasks**, **Flows**, **Queue** (what that module says about the project, from the `related` route: `tabs.<module>` of the response, with the reason when a module has nothing or did not answer), **Settings** (identity with the folder name (slug) form, hierarchy, folders, removal). The tool tabs are fixed (task, flow, queue: the `optionalRequires`); a module outside that list appears only in the overview table and the slot. The statistics are the counts the modules send (`count` + `countLabel`, shown as `countText`): they have different units, so there is no chart; per-state or over-time figures need a contract extension on the `related` response.
 
 ### What other modules can add to the project page
 
@@ -88,7 +88,7 @@ Each contribution is a `ButtonLink` to the page of the project, with no `$source
 
 All four are `ButtonLink` with `size: sm` and `variant: secondary`, like the header links of the hosts (flow: `size: sm, variant: secondary`; task: `size: sm`): at the default size they were 38 px high next to the hosts' 26 px; they now measure 26 px on the fixture pages that replicate the hosts' small links. `ButtonLink` has no no-wrap prop, so a long label (flow: "agent-fleet (92541e63)") can wrap in a narrow row.
 
-The address is built in the view: `to: "$concat('/modules/project/p/', $route.project)"`. A prop is an expression only when it starts with `$`: `/modules/project/p/$route.project` is followed as typed. The project page accepts an id, a name or an alias, so `?project=shop` works as well as `?project=<id>`. `$concat(...)` and `$urlParam.<name>` in a node prop (also in a contributed node) need dsl-renderer / dsl-ui 2026.10.31-306 or later; `$urlParam` and `$concat` are **not** available in the `params` or `url` of `$sources`.
+The address is built in the view: `to: "$concat('/modules/project/projects/', $route.project)"`. A prop is an expression only when it starts with `$`: `/modules/project/projects/$route.project` is followed as typed. The project page accepts an id, a name or an alias, so `?project=shop` works as well as `?project=<id>`. `$concat(...)` and `$urlParam.<name>` in a node prop (also in a contributed node) need dsl-renderer / dsl-ui 2026.10.31-306 or later; `$urlParam` and `$concat` are **not** available in the `params` or `url` of `$sources`.
 
 **Minimal versions** (pinned by `packages/project-cli/src/lockfile.test.ts`): `@wadeck-app/app-core-cli` and `@wadeck-app/app-core-sdk` 2026.10.31-145-cc2b3d27 (`optionalRequires`, `--link <moduleId>=<folder>` for optional providers, a shell with `$concat`), `@wadeck-app/dsl-ui` and `@wadeck-app/dsl-renderer` 2026.10.31-306-a2da8f4a.
 

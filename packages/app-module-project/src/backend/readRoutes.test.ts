@@ -65,7 +65,7 @@ describe('GET /projects', () => {
     // True on every answer that carries the list, even an empty one: the page shows the table and the add form only then.
     expect(body.ready).toBe(true);
     const row = body.projects.find((p: { id: string }) => p.id === shop.id);
-    expect(row).toMatchObject({ name: 'shop', aliasesText: 'sh', parentName: 'base', labelsText: 'state::production, team::blue', virtual: false, href: `/modules/project/p/${shop.id}` });
+    expect(row).toMatchObject({ name: 'shop', aliasesText: 'sh', parentName: 'base', labelsText: 'state::production, team::blue', virtual: false, href: `/modules/project/projects/${shop.id}` });
     expect(body.projects.find((p: { name: string }) => p.name === 'base')).toMatchObject({ virtual: true, virtualText: 'virtual' });
     expect(body.parentOptions).toEqual(expect.arrayContaining([{ value: shop.id, label: 'shop' }]));
   });

@@ -1,4 +1,4 @@
-# Project (route /p/:project, :project = $route.project: the id, a name or an alias): everything about one project and every change
+# Project (route /projects/:project, :project = $route.project: the id, a name or an alias): everything about one project and every change
 # of it. The module is the only UI that writes the registry, always through the project SDK (one lock, atomic file).
 #
 # Conventions
@@ -110,6 +110,32 @@ $actions:
     successMessage: Project removed (it is in the trash)
     errorPrefix: Could not remove the project
     reloadSources: true
+  # Popups: openX (no url) stores a marker under resultKey and the DialogForm with `visible: $<resultKey>` opens; closeX (`clear: true`, needs dsl-renderer >= 2026.11.21-359,
+  # in the app-core-cli that bundles it) removes the key: it is the `onClose` of the dialog (Cancel, the X, Escape, a successful Save).
+  openRename: { resultKey: dlgRename }
+  closeRename: { resultKey: dlgRename, clear: true }
+  openSlug: { resultKey: dlgSlug }
+  closeSlug: { resultKey: dlgSlug, clear: true }
+  openAddAlias: { resultKey: dlgAddAlias }
+  closeAddAlias: { resultKey: dlgAddAlias, clear: true }
+  openRemoveAlias: { resultKey: dlgRemoveAlias }
+  closeRemoveAlias: { resultKey: dlgRemoveAlias, clear: true }
+  openAddLabels: { resultKey: dlgAddLabels }
+  closeAddLabels: { resultKey: dlgAddLabels, clear: true }
+  openRemoveLabels: { resultKey: dlgRemoveLabels }
+  closeRemoveLabels: { resultKey: dlgRemoveLabels, clear: true }
+  openGit: { resultKey: dlgGit }
+  closeGit: { resultKey: dlgGit, clear: true }
+  openParent: { resultKey: dlgParent }
+  closeParent: { resultKey: dlgParent, clear: true }
+  openAddPath: { resultKey: dlgAddPath }
+  closeAddPath: { resultKey: dlgAddPath, clear: true }
+  openSetMain: { resultKey: dlgSetMain }
+  closeSetMain: { resultKey: dlgSetMain, clear: true }
+  openMovePath: { resultKey: dlgMovePath }
+  closeMovePath: { resultKey: dlgMovePath, clear: true }
+  openRemovePath: { resultKey: dlgRemovePath }
+  closeRemovePath: { resultKey: dlgRemovePath, clear: true }
 
 
 # A/B experiment (dev builds only, the floating dock): `current` is the tabbed page, the others are alternatives of the information
@@ -597,12 +623,13 @@ sections:
                             - $type: ButtonAction
                               label: Remove the project
                               variant: danger
-                              type: submit
 
-      # Variant 2: the same tabs, but a persistent summary (facts + one tile per tool) above them, and the registry edits folded away.
-      tabs-plus:
-        label: Tabs + summary
-        hint: Facts and one figure per tool stay above the tabs; the edit forms are folded in the Settings tab, the removal last.
+      # Round 2 (the first round was refused): every change is a small popup (DialogForm) with ONE field group, opened from a button; the
+      # page itself only shows facts. The dialogs are written once (&dialogs) and reused. A change that needs no field (clear the git url,
+      # remove the parent, remove the project) stays a one-button form in a folded "Danger zone" (a dialog has no way to submit without a field).
+      pencils:
+        label: Pencils
+        hint: Facts in a short list, a Change button beside each; each button opens a small popup with the one field to change.
         view:
           $type: VerticalStack
           gap: gap-4
@@ -613,88 +640,167 @@ sections:
             - *virtBadge
             - *linksStack
             - *parentBtn
-            - $type: HorizontalStack
+            - $type: Section
               $if: $sources.detail.project
-              gap: gap-4
-              align: items-stretch
-              itemSizes: [fixed, flex]
+              title: Project
               items:
-                - *identityStack
                 - $type: VerticalStack
-                  gap: gap-2
+                  gap: gap-1
                   items:
-                    # One tile per tool (the figure and what it counts, from the related route); a module with nothing says why instead.
-                    - &toolTiles
-                      $type: HorizontalStack
+                    - $type: HorizontalStack
                       gap: gap-2
-                      align: items-stretch
-                      itemSizes: [flex, flex, flex]
                       items:
-                        - $type: VerticalStack
-                          gap: gap-1
-                          items:
-                            - $type: StatTile
-                              $if: $sources.related.tabs.task.title
-                              label: $sources.related.tabs.task.figureLabel
-                              value: $sources.related.tabs.task.figureText
-                              compact: true
-                            - $type: Badge
-                              $if: $sources.related.tabs.task.emptyText
-                              label: $sources.related.tabs.task.emptyText
-                              variant: info
-                              size: sm
-                        - $type: VerticalStack
-                          gap: gap-1
-                          items:
-                            - $type: StatTile
-                              $if: $sources.related.tabs.flow.title
-                              label: $sources.related.tabs.flow.figureLabel
-                              value: $sources.related.tabs.flow.figureText
-                              compact: true
-                            - $type: Badge
-                              $if: $sources.related.tabs.flow.emptyText
-                              label: $sources.related.tabs.flow.emptyText
-                              variant: info
-                              size: sm
-                        - $type: VerticalStack
-                          gap: gap-1
-                          items:
-                            - $type: StatTile
-                              $if: $sources.related.tabs.queue.title
-                              label: $sources.related.tabs.queue.figureLabel
-                              value: $sources.related.tabs.queue.figureText
-                              compact: true
-                            - $type: Badge
-                              $if: $sources.related.tabs.queue.emptyText
-                              label: $sources.related.tabs.queue.emptyText
-                              variant: info
-                              size: sm
-                    - &factTiles
-                      $type: HorizontalStack
+                        - $type: Badge
+                          label: $sources.detail.project.idLine
+                        - { $type: ButtonAction, label: Rename, variant: ghost, size: sm, onClick: $ctx.openRename }
+                    - $type: HorizontalStack
                       gap: gap-2
-                      align: items-stretch
-                      itemSizes: [flex, flex]
                       items:
-                        - $type: StatTile
-                          label: Folders
-                          value: $sources.detail.project.paths.length
-                          compact: true
-                        - $type: StatTile
-                          label: Descendants
-                          value: $sources.detail.project.descendantsCount
-                          compact: true
+                        - $type: Badge
+                          label: $sources.detail.project.slugLine
+                        - { $type: ButtonAction, label: Change, variant: ghost, size: sm, onClick: $ctx.openSlug }
+                    - $type: HorizontalStack
+                      gap: gap-2
+                      items:
+                        - $type: Badge
+                          label: $sources.detail.project.aliasesLine
+                        - { $type: ButtonAction, label: Add, variant: ghost, size: sm, onClick: $ctx.openAddAlias }
+                        - { $type: ButtonAction, $if: $sources.detail.options.aliases.length, label: Remove, variant: ghost, size: sm, onClick: $ctx.openRemoveAlias }
+                    - $type: HorizontalStack
+                      gap: gap-2
+                      items:
+                        - $type: Badge
+                          label: $sources.detail.project.labelsLine
+                        - { $type: ButtonAction, label: Add, variant: ghost, size: sm, onClick: $ctx.openAddLabels }
+                        - { $type: ButtonAction, $if: $sources.detail.options.labels.length, label: Remove, variant: ghost, size: sm, onClick: $ctx.openRemoveLabels }
+                    - $type: HorizontalStack
+                      gap: gap-2
+                      items:
+                        - $type: Badge
+                          label: $sources.detail.project.gitLine
+                        - { $type: ButtonAction, label: Change, variant: ghost, size: sm, onClick: $ctx.openGit }
+            - &dialogs
+              $type: VerticalStack
+              $if: $sources.detail.project
+              items:
+                - $type: DialogForm
+                  title: Rename the project
+                  visible: $dlgRename
+                  onClose: $ctx.closeRename
+                  initialData: $sources.detail.forms.rename
+                  onSubmit: $ctx.rename
+                  size: sm
+                  fields:
+                    - { $type: FieldText, label: Name, bind: name, required: true }
+                - $type: DialogForm
+                  title: Change the folder name
+                  visible: $dlgSlug
+                  onClose: $ctx.closeSlug
+                  initialData: $sources.detail.forms.slug
+                  onSubmit: $ctx.setSlug
+                  size: sm
+                  fields:
+                    - { $type: FieldText, label: 'Folder name (kebab-case, 1 to 20 characters; the folder is moved)', bind: slug, required: true }
+                - $type: DialogForm
+                  title: Add an alias
+                  visible: $dlgAddAlias
+                  onClose: $ctx.closeAddAlias
+                  initialData: $sources.detail.forms.empty
+                  onSubmit: $ctx.addAlias
+                  size: sm
+                  fields:
+                    - { $type: FieldText, label: Alias, bind: alias, required: true }
+                - $type: DialogForm
+                  title: Remove an alias
+                  visible: $dlgRemoveAlias
+                  onClose: $ctx.closeRemoveAlias
+                  initialData: $sources.detail.forms.empty
+                  onSubmit: $ctx.removeAlias
+                  size: sm
+                  fields:
+                    - { $type: FieldSelect, label: Alias, bind: alias, options: $sources.detail.options.aliases, placeholder: Choose an alias, required: true }
+                - $type: DialogForm
+                  title: Add labels
+                  visible: $dlgAddLabels
+                  onClose: $ctx.closeAddLabels
+                  initialData: $sources.detail.forms.empty
+                  onSubmit: $ctx.addLabels
+                  size: sm
+                  fields:
+                    - { $type: FieldText, label: 'Labels (separated by spaces or commas, e.g. state::production team::blue)', bind: labels, required: true }
+                - $type: DialogForm
+                  title: Remove a label
+                  visible: $dlgRemoveLabels
+                  onClose: $ctx.closeRemoveLabels
+                  initialData: $sources.detail.forms.empty
+                  onSubmit: $ctx.removeLabels
+                  size: sm
+                  fields:
+                    - { $type: FieldSelect, label: Label, bind: labels, options: $sources.detail.options.labels, placeholder: Choose a label, required: true }
+                - $type: DialogForm
+                  title: Change the git url
+                  visible: $dlgGit
+                  onClose: $ctx.closeGit
+                  initialData: $sources.detail.forms.git
+                  onSubmit: $ctx.setGit
+                  size: sm
+                  fields:
+                    - { $type: FieldText, label: Git url, bind: git, required: true }
+                - $type: DialogForm
+                  title: Change the parent
+                  visible: $dlgParent
+                  onClose: $ctx.closeParent
+                  initialData: $sources.detail.forms.parent
+                  onSubmit: $ctx.setParent
+                  size: sm
+                  fields:
+                    - { $type: FieldSelect, label: Parent, bind: parent, options: $sources.detail.options.parents, placeholder: Choose a parent, required: true }
+                - $type: DialogForm
+                  title: Add a folder
+                  visible: $dlgAddPath
+                  onClose: $ctx.closeAddPath
+                  initialData: $sources.detail.forms.empty
+                  onSubmit: $ctx.addPath
+                  size: sm
+                  fields:
+                    - { $type: FieldText, label: Folder (an existing folder), bind: path, required: true }
+                    - { $type: Switch, label: Make it the main folder, bind: main }
+                - $type: DialogForm
+                  title: Change the main folder
+                  visible: $dlgSetMain
+                  onClose: $ctx.closeSetMain
+                  initialData: $sources.detail.forms.empty
+                  onSubmit: $ctx.setMain
+                  size: sm
+                  fields:
+                    - { $type: FieldSelect, label: New main folder, bind: path, options: $sources.detail.options.otherPaths, placeholder: Choose a folder, required: true }
+                - $type: DialogForm
+                  title: A folder moved
+                  visible: $dlgMovePath
+                  onClose: $ctx.closeMovePath
+                  initialData: $sources.detail.forms.empty
+                  onSubmit: $ctx.movePath
+                  size: sm
+                  fields:
+                    - { $type: FieldSelect, label: Folder that moved, bind: from, options: $sources.detail.options.paths, placeholder: Choose a folder, required: true }
+                    - { $type: FieldText, label: Its new location (an existing folder), bind: to, required: true }
+                - $type: DialogForm
+                  title: Remove a folder
+                  visible: $dlgRemovePath
+                  onClose: $ctx.closeRemovePath
+                  initialData: $sources.detail.forms.empty
+                  onSubmit: $ctx.removePath
+                  size: sm
+                  fields:
+                    - { $type: FieldSelect, label: Folder, bind: path, options: $sources.detail.options.paths, placeholder: Choose a folder, required: true }
+                    - { $type: FieldSelect, $if: $sources.detail.options.otherPaths.length, label: New main folder (needed when removing the main folder), bind: newMain, options: $sources.detail.options.otherPaths, placeholder: Keep the current main folder }
             - $type: PageTabs
               $if: $sources.detail.project
               urlParam: tab
               tabs:
                 - id: overview
                   label: Overview
-                  children:
-                    - *relErr
-                    - *relEmpty
-                    - *summaryTable
-                    - *relWarn
-                    - *panelsSlot
+                  children: [*relErr, *relEmpty, *summaryTable, *relWarn, *panelsSlot]
                 - id: task
                   label: Tasks
                   children: [*taskEmpty, *taskSection]
@@ -712,39 +818,32 @@ sections:
                       items:
                         - *childrenTable
                         - *descTable
-                        - &editHierarchy
-                          $type: Collapsible
-                          title: Change the parent
-                          items: [*fSetParent, *fClearParent]
+                        - { $type: ButtonAction, label: Change the parent, variant: ghost, size: sm, onClick: $ctx.openParent }
                     - $type: Section
                       title: Folders
                       items:
                         - *virtFolderBadge
                         - *pathsTable
                         - *toolFoldersBadge
-                        - &editFolders
-                          $type: Collapsible
-                          title: Add, move or remove folders
-                          items: [*fAddPath, *fSetMain, *fMovePath, *fRemovePath]
-                    - $type: Section
-                      title: Identity
-                      items:
-                        - &editIdentity
-                          $type: Collapsible
-                          title: Rename, folder name, aliases, labels, git url
-                          items: [*fRename, *fSetSlug, *fAddAlias, *fRemoveAlias, *fAddLabels, *fRemoveLabels, *fSetGit, *fClearGit]
+                        - &folderButtons
+                          $type: HorizontalStack
+                          gap: gap-2
+                          items:
+                            - { $type: ButtonAction, label: Add, variant: ghost, size: sm, onClick: $ctx.openAddPath }
+                            - { $type: ButtonAction, $if: $sources.detail.options.otherPaths.length, label: Main folder, variant: ghost, size: sm, onClick: $ctx.openSetMain }
+                            - { $type: ButtonAction, $if: $sources.detail.options.paths.length, label: Moved, variant: ghost, size: sm, onClick: $ctx.openMovePath }
+                            - { $type: ButtonAction, $if: $sources.detail.options.paths.length, label: Remove, variant: ghost, size: sm, onClick: $ctx.openRemovePath }
                     - $type: Section
                       title: Danger zone
                       items:
                         - &dangerZone
                           $type: Collapsible
-                          title: Remove this project
-                          items: [*fRemoveProject]
+                          title: Clear the git url, remove the parent, remove the project
+                          items: [*fClearGit, *fClearParent, *fRemoveProject]
 
-      # Variant 3: no tabs: the activity of every tool on the left, the registry entry (facts, folders, edits, removal) on the right.
-      side:
-        label: Side panel
-        hint: Every tool on one page at the left; at the right a 20rem panel with the facts, folders and folded edits.
+      toolbar:
+        label: Toolbar
+        hint: One row of buttons under the title (rename, folder name, alias, label, git, parent, folders), each opening its popup; no list of facts above the tabs.
         view:
           $type: VerticalStack
           gap: gap-4
@@ -757,202 +856,47 @@ sections:
             - *parentBtn
             - $type: HorizontalStack
               $if: $sources.detail.project
-              gap: gap-6
-              align: items-start
-              itemSizes: [flex, fixed]
+              gap: gap-2
+              wrap: true
               items:
-                - $type: VerticalStack
-                  gap: gap-4
-                  items:
-                    - *toolTiles
-                    - *relErr
-                    - *relEmpty
-                    - *relWarn
-                    - *taskEmpty
-                    - *taskSection
-                    - *flowEmpty
-                    - *flowSection
-                    - *queueEmpty
-                    - *queueSection
-                    - *panelsSlot
-                - $type: VerticalStack
-                  gap: gap-4
-                  items:
-                    - $type: Card
-                      padding: md
-                      items:
-                        - $type: VerticalStack
-                          gap: gap-3
-                          items:
-                            - $type: Section
-                              title: Project
-                              items:
-                                - *identityStack
-                            - $type: Section
-                              title: Folders
-                              items:
-                                - *virtFolderBadge
-                                - *pathsTable
-                                - *toolFoldersBadge
-                            - $type: Section
-                              title: Hierarchy
-                              items:
-                                - *factTiles
-                                - *childrenTable
-                                - *descTable
-                    - $type: Section
-                      title: Edit
-                      items:
-                        - *editIdentity
-                        - *editHierarchy
-                        - *editFolders
-                        - *dangerZone
-
-      # Variant 4: a dashboard: the figures first, the three tools as columns of cards, the registry entry underneath as read-only
-      # facts with the edits folded.
-      dashboard:
-        label: Dashboard
-        hint: Figures on top, one card per tool side by side, then the registry facts with every edit folded away.
-        view:
-          $type: VerticalStack
-          gap: gap-4
-          items:
-            - *hdr
-            - *errBadge
-            - *warnBadge
-            - *virtBadge
-            - *linksStack
-            - *parentBtn
-            - $type: VerticalStack
-              $if: $sources.detail.project
-              gap: gap-4
-              items:
-                - $type: HorizontalStack
-                  gap: gap-4
-                  align: items-stretch
-                  itemSizes: [flex, fixed]
-                  items:
-                    - *toolTiles
-                    - *factTiles
-                - *relErr
-                - *relEmpty
-                - *relWarn
-                - $type: HorizontalStack
-                  gap: gap-4
-                  align: items-start
-                  itemSizes: [flex, flex, flex]
-                  items:
-                    - $type: Card
-                      padding: md
-                      items:
-                        - *taskEmpty
-                        - *taskSection
-                    - $type: Card
-                      padding: md
-                      items:
-                        - *flowEmpty
-                        - *flowSection
-                    - $type: Card
-                      padding: md
-                      items:
-                        - *queueEmpty
-                        - *queueSection
-                - *panelsSlot
-                - $type: HorizontalStack
-                  gap: gap-4
-                  align: items-start
-                  itemSizes: [flex, flex]
-                  items:
-                    - $type: Card
-                      padding: md
-                      items:
-                        - $type: Section
-                          title: Project
-                          items:
-                            - *identityStack
-                            - *childrenTable
-                            - *descTable
-                    - $type: Card
-                      padding: md
-                      items:
-                        - $type: Section
-                          title: Folders
-                          items:
-                            - *virtFolderBadge
-                            - *pathsTable
-                            - *toolFoldersBadge
-                - $type: Section
-                  title: Edit the registry entry
-                  items:
-                    - *editIdentity
-                    - *editHierarchy
-                    - *editFolders
-                    - *dangerZone
-
-      # Variant 5: organised by concern instead of by tool: one merged feed of everything the tools say, then structure, then identity.
-      feed:
-        label: One feed
-        hint: Three tabs by concern (Activity as one merged table of every tool, Structure, Identity and removal), tiles above.
-        view:
-          $type: VerticalStack
-          gap: gap-4
-          items:
-            - *hdr
-            - *errBadge
-            - *warnBadge
-            - *virtBadge
-            - *linksStack
-            - *parentBtn
-            - $type: HorizontalStack
-              $if: $sources.detail.project
-              gap: gap-4
-              align: items-stretch
-              itemSizes: [flex, fixed]
-              items:
-                - *toolTiles
-                - *factTiles
+                - { $type: ButtonAction, label: Rename, variant: secondary, size: sm, onClick: $ctx.openRename }
+                - { $type: ButtonAction, label: Folder name, variant: secondary, size: sm, onClick: $ctx.openSlug }
+                - { $type: ButtonAction, label: Add an alias, variant: secondary, size: sm, onClick: $ctx.openAddAlias }
+                - { $type: ButtonAction, $if: $sources.detail.options.aliases.length, label: Remove an alias, variant: ghost, size: sm, onClick: $ctx.openRemoveAlias }
+                - { $type: ButtonAction, label: Add labels, variant: secondary, size: sm, onClick: $ctx.openAddLabels }
+                - { $type: ButtonAction, $if: $sources.detail.options.labels.length, label: Remove a label, variant: ghost, size: sm, onClick: $ctx.openRemoveLabels }
+                - { $type: ButtonAction, label: Git url, variant: secondary, size: sm, onClick: $ctx.openGit }
+                - { $type: ButtonAction, label: Parent, variant: secondary, size: sm, onClick: $ctx.openParent }
+            - *dialogs
             - $type: PageTabs
               $if: $sources.detail.project
               urlParam: tab
               tabs:
-                - id: activity
-                  label: Activity
+                - id: overview
+                  label: Overview
+                  children: [*relErr, *relEmpty, *summaryTable, *relWarn, *panelsSlot]
+                - id: task
+                  label: Tasks
+                  children: [*taskEmpty, *taskSection]
+                - id: flow
+                  label: Flows
+                  children: [*flowEmpty, *flowSection]
+                - id: queue
+                  label: Queue
+                  children: [*queueEmpty, *queueSection]
+                - id: settings
+                  label: Settings
                   children:
-                    - *relErr
-                    - *relEmpty
-                    - *relWarn
-                    # Every item of every tool, one row each, grouped by tool (the providers send no common timestamp to sort on).
-                    - $type: DataTable
-                      $if: $sources.related.hasPanels
-                      rows: $sources.related.rows
-                      navigateTo: '{href}'
-                      emptyMessage: Nothing yet
-                      columns:
-                        - { key: 'module', label: 'Module', nowrap: true }
-                        - { key: 'panel', label: 'What' }
-                        - { key: 'label', label: 'Item' }
-                        - { key: 'subtitle', label: 'Details' }
-                    - *summaryTable
-                    - *panelsSlot
-                - id: structure
-                  label: Structure
-                  children:
+                    - $type: Section
+                      title: Identity
+                      items:
+                        - *identityStack
                     - $type: Section
                       title: Hierarchy
-                      items:
-                        - *childrenTable
-                        - *descTable
-                        - *editHierarchy
+                      items: [*childrenTable, *descTable]
                     - $type: Section
                       title: Folders
-                      items:
-                        - *virtFolderBadge
-                        - *pathsTable
-                        - *toolFoldersBadge
-                        - *editFolders
-                - id: identity
-                  label: Identity
-                  children:
-                    - *identityStack
-                    - *editIdentity
-                    - *dangerZone
+                      items: [*virtFolderBadge, *pathsTable, *toolFoldersBadge, *folderButtons]
+                    - $type: Section
+                      title: Danger zone
+                      items: [*dangerZone]

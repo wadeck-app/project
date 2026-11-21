@@ -6,4 +6,4 @@ size: sm
 variant: secondary
 $if: $sources.execution.projectId
 label: "$sources.execution.projectLabel || 'Project'"
-to: "$concat('/modules/project/p/', $sources.execution.projectId)"
+to: "$concat('/modules/project/projects/', $sources.execution.projectId)"

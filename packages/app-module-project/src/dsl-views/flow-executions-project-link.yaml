@@ -6,4 +6,4 @@ size: sm
 variant: secondary
 $if: $urlParam.project
 label: Project
-to: "$concat('/modules/project/p/', $urlParam.project)"
+to: "$concat('/modules/project/projects/', $urlParam.project)"

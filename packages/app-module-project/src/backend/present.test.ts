@@ -40,7 +40,7 @@ describe('projectRow', () => {
       mainPathText: toNativePath(`${base}/shop-main`),
       virtual: false,
       virtualText: '',
-      href: `/modules/project/p/${shop.id}`,
+      href: `/modules/project/projects/${shop.id}`,
     });
   });
 
@@ -96,7 +96,7 @@ describe('treeRows', () => {
       ['a1', 'a', 0, 0],
     ]);
     expect(rows.find((r) => r.name === 'base')).toMatchObject({ virtual: true, virtualText: 'virtual' });
-    expect(rows.find((r) => r.name === 'other')).toMatchObject({ virtual: false, href: `/modules/project/p/${other.id}` });
+    expect(rows.find((r) => r.name === 'other')).toMatchObject({ virtual: false, href: `/modules/project/projects/${other.id}` });
     expect(warnings).toEqual([]);
   });
 
@@ -163,7 +163,7 @@ describe('detailOf', () => {
       warnings: [],
       warningsText: '',
     });
-    expect(detail.parent).toEqual({ id: root.id, name: 'base', href: `/modules/project/p/${root.id}` });
+    expect(detail.parent).toEqual({ id: root.id, name: 'base', href: `/modules/project/projects/${root.id}` });
     expect(detail.chain.map((c) => c.name)).toEqual(['grand', 'base', 'shop']);
     expect(detail.children.map((c) => c.name)).toEqual(['kid']);
     expect(detail.descendants.map((c) => c.name)).toEqual(['kid', 'grandkid']);

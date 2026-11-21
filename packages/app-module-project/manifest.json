@@ -29,7 +29,7 @@
       "kind": "page",
       "slot": "nav",
       "label": "Projects",
-      "path": "/",
+      "path": "/projects",
       "view": {
         "type": "path",
         "value": "./src/dsl-views/projects-page.yaml"
@@ -59,7 +59,7 @@
       "kind": "page",
       "slot": "route",
       "label": "Project",
-      "path": "/p/:project",
+      "path": "/projects/:project",
       "view": {
         "type": "path",
         "value": "./src/dsl-views/project-page.yaml"

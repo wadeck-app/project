@@ -65,9 +65,9 @@ describe('the widgets it contributes', () => {
     expect(widgets.map((point) => point.slot).sort()).toEqual(Object.keys(PROVIDERS).sort());
   });
 
-  // A prop is an expression only when it STARTS with $: "/modules/project/p/$route.project" is followed as typed (seen in a browser), the address is
+  // A prop is an expression only when it STARTS with $: "/modules/project/projects/$route.project" is followed as typed (seen in a browser), the address is
   // therefore built with $concat(...) (dsl-renderer 2026.10.31-306 and later).
-  const link = (id: string): string => `$concat('/modules/project/p/', ${id})`;
+  const link = (id: string): string => `$concat('/modules/project/projects/', ${id})`;
   const ID_OF: Record<keyof typeof PROVIDERS, string> = {
     'task:project-header': '$route.project',
     'queue:project-header': '$sources.projectScope.id',

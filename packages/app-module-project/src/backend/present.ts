@@ -15,7 +15,7 @@ import {
 
 /** Where the detail page of a project is (module id and page path are fixed by manifest.json). */
 export function projectHref(id: string): string {
-  return `/modules/project/p/${id}`;
+  return `/modules/project/projects/${id}`;
 }
 
 export interface ProjectRow {

@@ -90,8 +90,8 @@ describe('package-lock.json and the optional contributions of app-core', () => {
 describe('package-lock.json and the expressions of the contributed links', () => {
   const MINIMUM = '2026.10.31-306-a2da8f4a';
 
-  // The widgets contributed to task, queue and flow build their address with to: "$concat('/modules/project/p/', $route.project)" and read $urlParam.project:
-  // an older dsl-renderer follows the text as it is (href="/modules/project/p/$route.project"), seen in a browser, and has no $urlParam in a node prop.
+  // The widgets contributed to task, queue and flow build their address with to: "$concat('/modules/project/projects/', $route.project)" and read $urlParam.project:
+  // an older dsl-renderer follows the text as it is (href="/modules/project/projects/$route.project"), seen in a browser, and has no $urlParam in a node prop.
   it.each(['@wadeck-app/dsl-renderer', '@wadeck-app/dsl-ui'])('pins %s with $concat and $urlParam in node props (2026.10.31-306 or later)', (name) => {
     const locked = lockedVersion(name);
     expect(
