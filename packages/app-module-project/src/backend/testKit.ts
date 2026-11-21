@@ -24,21 +24,23 @@ interface Route {
   method: string;
   segments: string[];
   handler: (req: unknown, reply: unknown) => unknown;
+  effect?: string;
 }
 
 /** A module context that only records the routes, and `call` runs one the way app-core's router does (method, segments, decoded params). */
-export function makeModule(): { call: (method: string, path: string, options?: CallOptions) => Promise<Call>; routes: string[] } {
+export function makeModule(): { call: (method: string, path: string, options?: CallOptions) => Promise<Call>; routes: string[]; sensitiveRoutes: string[] } {
   const routes: Route[] = [];
   const ctx = {
     dataDir: tmpdir(),
-    registerRoute: (method: string, subPath: string, handler: Route['handler']) => {
-      routes.push({ method, segments: subPath.split('/').filter(Boolean), handler });
+    registerRoute: (method: string, subPath: string, handler: Route['handler'], options?: { effect?: string }) => {
+      routes.push({ method, segments: subPath.split('/').filter(Boolean), handler, effect: options?.effect });
     },
   } as unknown as ModuleContext;
   registerProjectRoutes(ctx);
 
   return {
     routes: routes.map((r) => `${r.method} /${r.segments.join('/')}`),
+    sensitiveRoutes: routes.filter((r) => r.effect === 'sensitive').map((r) => `${r.method} /${r.segments.join('/')}`),
     async call(method, path, options = {}) {
       const [pathOnly = '', queryString] = path.split('?');
       const segments = pathOnly.split('/').filter(Boolean);

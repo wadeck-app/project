@@ -69,6 +69,7 @@ export function registerWriteRoutes(kit: RouteKit): void {
     return changed(`Renamed '${old.name}' to '${updated.name}'.`, updated);
   });
 
+  // Sensitive: it moves a folder on disk under the tools' data (app-core-owner audit); the shell asks the PIN, a curl gets 401.
   kit.route('PUT', '/projects/:ref/slug', async (req) => {
     const { slug } = parseBody(req.body, { ref: 'ignored?', slug: 'string' });
     const old = before(req);
@@ -81,7 +82,7 @@ export function registerWriteRoutes(kit: RouteKit): void {
         ? `Folder name of ${updated.name} changed to '${slug}': the folder was moved from ${toNativePath(normalizePath(result.from))} to ${toNativePath(normalizePath(result.to))}.`
         : `Folder name of ${updated.name} changed to '${slug}' (the folder does not exist yet, nothing was moved).`;
     return changed(message, updated);
-  });
+  }, { effect: 'sensitive' });
 
   kit.route('POST', '/projects/:ref/aliases', async (req) => {
     const { alias } = parseBody(req.body, { ref: 'ignored?', alias: 'string' });

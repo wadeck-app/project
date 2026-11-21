@@ -255,3 +255,9 @@ describe('GET /deleted', () => {
     expect(body).toMatchObject({ count: 0, projects: [], emptyText: 'The trash is empty.' });
   });
 });
+
+describe('routes behind the PIN of app-core (effect: sensitive)', () => {
+  it('only the rename of the slug, which moves a folder on disk, asks for the PIN; the other routes are unchanged', () => {
+    expect(makeModule().sensitiveRoutes).toEqual(['PUT /projects/:ref/slug']);
+  });
+});

@@ -30,7 +30,7 @@ Base `/api/modules/project`. Bodies are JSON objects; an unknown field is a 400.
 | `GET /health` | update test of app-core-cli, read-only: `registry` parses and is consistent, `trash` parses, `folders` = one data folder per project. `{ ok, checks[] }` |
 | `POST /projects` | `name`, `path?`, `aliases?`, `labels?`, `parent?`, `git?`, `virtual?` (201) |
 | `PUT /projects/:ref/name` | `name` |
-| `PUT /projects/:ref/slug` | `slug`; **moves the project folder** (400 invalid slug, 409 two folders for the project or the OS refuses the move because a tool holds it, nothing changed) |
+| `PUT /projects/:ref/slug` | `slug`; **moves the project folder**, asks the app-core PIN (`effect: 'sensitive'`: a client without access token gets 401, 403 until `app-core-cli pin set`) (400 invalid slug, 409 two folders for the project or the OS refuses the move because a tool holds it, nothing changed) |
 | `POST` / `DELETE /projects/:ref/aliases` | `alias` |
 | `POST` / `DELETE /projects/:ref/labels` | `labels` (list or text) |
 | `PUT /projects/:ref/parent`, `DELETE` | `parent` |

@@ -20,7 +20,8 @@ export const ok = (body: unknown): RouteAnswer => ({ status: 200, body });
 
 export interface RouteKit {
   /** Registers a route; every error thrown by `run` becomes its HTTP answer (see httpError.ts). */
-  route(method: string, subPath: string, run: (req: RouteRequest) => Promise<RouteAnswer>): void;
+  /** `effect: 'sensitive'`: app-core asks the user for the PIN before the route runs (the shell does it by itself). */
+  route(method: string, subPath: string, run: (req: RouteRequest) => Promise<RouteAnswer>, options?: { effect?: 'sensitive' }): void;
 }
 
 type Reply = { code(status: number): { send(body: unknown): unknown } };
@@ -36,7 +37,7 @@ function inline(failure: { status: number; body: Record<string, unknown> }): { s
 
 export function createRouteKit(ctx: ModuleContext, writeStderr: (text: string) => void = (text) => void process.stderr.write(text)): RouteKit {
   return {
-    route(method, subPath, run) {
+    route(method, subPath, run, options) {
       ctx.registerRoute(method, subPath, async (req, reply) => {
         const out = reply as unknown as Reply;
         const request = req as unknown as RouteRequest;
@@ -57,7 +58,7 @@ export function createRouteKit(ctx: ModuleContext, writeStderr: (text: string) =
           const answer = asData ? inline(failure) : failure;
           return out.code(answer.status).send(answer.body);
         }
-      });
+      }, options);
     },
   };
 }
